@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<title>Quant Study Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
+  --text: #e2e8f0; --text2: #94a3b8; --accent: #4f46e5;
+  --green: #22c55e; --red: #ef4444; --orange: #f59e0b;
+  --blue: #3b82f6; --purple: #8b5cf6; --pink: #ec4899;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px; }
+.container { max-width: 800px; margin: 0 auto; padding: 16px; }
+.hidden { display: none !important; }
+
+/* Header */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
+.header h1 { font-size: 1.4rem; font-weight: 700; }
+.header h1 span { color: var(--accent); }
+.subtitle { color: var(--text2); font-size: 0.85rem; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; background: var(--bg2); padding: 4px; border-radius: 12px; margin-bottom: 20px; overflow-x: auto; }
+.tab { flex: 1; min-width: fit-content; padding: 8px 14px; border: none; background: transparent; color: var(--text2); font-size: 0.8rem; font-weight: 600; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+.tab.active { background: var(--accent); color: white; }
+.tab:hover:not(.active) { background: var(--bg3); color: var(--text); }
+
+/* Cards */
+.card { background: var(--bg2); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.card-title { font-size: 0.85rem; color: var(--text2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Stats grid */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.stat-card { background: var(--bg2); border-radius: 10px; padding: 14px; text-align: center; }
+.stat-value { font-size: 1.6rem; font-weight: 700; }
+.stat-label { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+
+/* Progress bar */
+.progress-bar { width: 100%; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--blue)); border-radius: 4px; transition: width 0.3s; }
+
+/* Schedule items */
+.sched-item { display: flex; gap: 12px; padding: 12px; background: var(--bg3); border-radius: 8px; margin-bottom: 8px; align-items: center; }
+.sched-time { font-size: 0.8rem; color: var(--text2); min-width: 80px; font-weight: 600; }
+.sched-title { flex: 1; font-weight: 500; font-size: 0.9rem; }
+.sched-subject { font-size: 0.75rem; color: var(--text2); }
+.sched-color { width: 4px; min-height: 40px; border-radius: 2px; }
+
+/* Phase list */
+.phase-item { margin-bottom: 10px; }
+.phase-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.phase-name { font-weight: 500; font-size: 0.9rem; }
+.phase-pct { font-size: 0.8rem; color: var(--text2); }
+.phase-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.phase-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+/* Buttons */
+.btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+.btn-outline { background: transparent; border: 1px solid var(--bg3); color: var(--text); }
+.btn-outline:hover { background: var(--bg3); }
+.btn-danger { background: var(--red); color: white; }
+
+/* Forms */
+select, input { background: var(--bg3); border: 1px solid transparent; color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; width: 100%; margin-bottom: 8px; }
+select:focus, input:focus { outline: none; border-color: var(--accent); }
+textarea { background: var(--bg3); border: 1px solid transparent; color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; width: 100%; min-height: 60px; resize: vertical; font-family: inherit; }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.modal { background: var(--bg2); border-radius: 16px; padding: 24px; width: 100%; max-width: 420px; max-height: 80vh; overflow-y: auto; }
+.modal h3 { margin-bottom: 16px; font-size: 1.1rem; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.modal-actions .btn { flex: 1; }
+
+/* Floating action button */
+.fab { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: white; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 20px rgba(79,70,229,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; transition: transform 0.2s; }
+.fab:hover { transform: scale(1.1); }
+
+/* Timeline */
+.timeline { position: relative; padding-left: 20px; }
+.timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 2px; background: var(--bg3); }
+.timeline-item { position: relative; padding: 8px 0 8px 16px; }
+.timeline-item::before { content: ''; position: absolute; left: -15px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+
+/* Checklists */
+.check-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--bg3); }
+.check-item:last-child { border-bottom: none; }
+.check-box { width: 18px; height: 18px; border: 2px solid var(--text2); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+.check-box.checked { background: var(--green); border-color: var(--green); }
+.check-box.checked::after { content: '✓'; color: white; font-size: 12px; font-weight: bold; }
+.check-label { flex: 1; font-size: 0.85rem; }
+.check-label.done { text-decoration: line-through; color: var(--text2); }
+.check-category { font-size: 0.7rem; color: var(--text2); background: var(--bg3); padding: 2px 8px; border-radius: 4px; }
+
+/* Quick add menu */
+.quick-menu { position: fixed; bottom: 90px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 99; }
+.quick-btn { padding: 12px 20px; border: none; border-radius: 10px; font-weight: 600; font-size: 0.85rem; cursor: pointer; color: white; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+
+/* Heatmap */
+.heatmap { display: flex; gap: 3px; flex-wrap: wrap; }
+.heat-cell { width: 14px; height: 14px; border-radius: 3px; background: var(--bg3); }
+.heat-cell.l1 { background: #1a365d; }
+.heat-cell.l2 { background: #2b6cb0; }
+.heat-cell.l3 { background: #4299e1; }
+.heat-cell.l4 { background: #63b3ed; }
+
+/* Charts */
+.chart-container { height: 200px; margin: 10px 0; }
+
+/* Empty state */
+.empty { text-align: center; padding: 30px; color: var(--text2); font-size: 0.9rem; }
+
+/* PWA install banner */
+.install-banner { background: var(--accent); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-radius: 12px; margin-bottom: 12px; }
+.install-banner p { font-size: 0.85rem; }
+.install-banner .btn { background: white; color: var(--accent); }
+
+/* Timer */
+.timer-display { font-size: 2.5rem; font-weight: 700; text-align: center; padding: 20px 0; font-variant-numeric: tabular-nums; }
+.timer-controls { display: flex; gap: 10px; justify-content: center; }
+
+@media (max-width: 600px) {
+  .container { padding: 10px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .header h1 { font-size: 1.1rem; }
+  .tab { font-size: 0.7rem; padding: 6px 10px; }
+  .timer-display { font-size: 2rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>Quant<span>Track</span></h1>
+      <div class="subtitle" id="headerDate"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-sm btn-outline" onclick="refreshAll()">↻ Sync</button>
+      <span id="streakBadge" style="font-size:1.2rem;"></span>
+    </div>
+  </div>
+
+  <!-- PWA Install Banner -->
+  <div id="installBanner" class="install-banner hidden">
+    <p>📲 Install for quick access</p>
+    <button class="btn btn-sm" onclick="installPWA()">Install</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="schedule">Schedule</button>
+    <button class="tab" data-tab="timer">Timer</button>
+    <button class="tab" data-tab="phases">Phases</button>
+    <button class="tab" data-tab="projects">Projects</button>
+    <button class="tab" data-tab="books">Books</button>
+    <button class="tab" data-tab="journal">Journal</button>
+    <button class="tab" data-tab="report">Report</button>
+  </div>
+
+  <!-- ============ TAB: DASHBOARD ============ -->
+  <div id="tab-dashboard" class="tab-content">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value" id="dashToday">0</div><div class="stat-label">Today (min)</div></div>
+      <div class="stat-card"><div class="stat-value" id="dashWeek">0</div><div class="stat-label">This Week (hrs)</div></div>
+      <div class="stat-card"><div class="stat-value" id="dashStreak">0</div><div class="stat-label">Day Streak</div></div>
+      <div class="stat-card"><div class="stat-value" id="dashProgress">0%</div><div class="stat-label">Overall</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Today's Schedule</div>
+      <div id="todaySchedule"><div class="empty">No sessions today</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Upcoming 7 Days</div>
+      <div id="upcomingSchedule"><div class="empty">Nothing upcoming</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Study Trend (Last 7 Days)</div>
+      <div class="chart-container"><canvas id="weeklyChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Phase Progress</div>
+      <div id="phaseProgressList"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: SCHEDULE ============ -->
+  <div id="tab-schedule" class="tab-content hidden">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <input type="date" id="scheduleStart" style="flex:1;min-width:120px;">
+      <input type="date" id="scheduleEnd" style="flex:1;min-width:120px;">
+      <button class="btn btn-primary btn-sm" onclick="loadSchedule()">Filter</button>
+      <button class="btn btn-outline btn-sm" onclick="showAddSchedule()">+ Add</button>
+    </div>
+    <div id="scheduleList"></div>
+  </div>
+
+  <!-- ============ TAB: TIMER ============ -->
+  <div id="tab-timer" class="tab-content hidden">
+    <div class="card">
+      <div class="card-title">Focus Timer</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <select id="timerPhase" style="flex:1;">
+          <option value="">Select phase...</option>
+        </select>
+        <select id="timerMode" style="flex:1;">
+          <option value="focus">Focus (25 min)</option>
+          <option value="short">Short Break (5 min)</option>
+          <option value="long">Long Break (15 min)</option>
+        </select>
+      </div>
+      <div class="timer-display" id="timerDisplay">25:00</div>
+      <div class="timer-controls">
+        <button class="btn btn-primary" onclick="toggleTimer()" id="timerBtn">Start</button>
+        <button class="btn btn-outline" onclick="resetTimer()">Reset</button>
+      </div>
+      <div style="margin-top:12px;font-size:0.8rem;color:var(--text2);text-align:center;" id="timerStatus">Ready</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Quick Log Time</div>
+      <select id="logPhase" style="margin-bottom:6px;"><option value="">Select phase...</option></select>
+      <div style="display:flex;gap:8px;">
+        <input type="number" id="logMinutes" placeholder="Minutes" style="flex:1;" min="1">
+        <button class="btn btn-primary" onclick="logTime()">Log</button>
+      </div>
+      <div style="margin-top:12px;" id="recentLogs"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: PHASES ============ -->
+  <div id="tab-phases" class="tab-content hidden">
+    <div class="card">
+      <div class="card-title">All Phases</div>
+      <div id="allPhasesList"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Activities & Resources</div>
+      <select id="activityPhaseFilter" onchange="loadActivities()"><option value="">All phases</option></select>
+      <div id="activitiesList" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: PROJECTS ============ -->
+  <div id="tab-projects" class="tab-content hidden">
+    <div class="card">
+      <div class="card-title">Projects & Challenges</div>
+      <div id="projectsList"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: BOOKS ============ -->
+  <div id="tab-books" class="tab-content hidden">
+    <div class="card">
+      <div class="card-title">Reading Tracker</div>
+      <select id="bookPhaseFilter" onchange="loadBooks()"><option value="">All phases</option></select>
+      <div id="booksList" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: JOURNAL ============ -->
+  <div id="tab-journal" class="tab-content hidden">
+    <div class="card">
+      <div class="card-title">Write Entry</div>
+      <select id="journalPhase"><option value="">General</option></select>
+      <textarea id="journalContent" placeholder="What did you learn or try today?" style="margin-top:6px;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <select id="journalMood">
+          <option value="">Mood</option>
+          <option value="😄">😄 Great</option>
+          <option value="🙂">🙂 Good</option>
+          <option value="😐">😐 Okay</option>
+          <option value="😕">😕 Tough</option>
+        </select>
+        <button class="btn btn-primary" onclick="saveJournal()">Save</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent Entries</div>
+      <div id="journalList"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: REPORT ============ -->
+  <div id="tab-report" class="tab-content hidden">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value" id="reportTotal">0</div><div class="stat-label">Total Hrs</div></div>
+      <div class="stat-card"><div class="stat-value" id="reportBest">-</div><div class="stat-label">Best Day</div></div>
+      <div class="stat-card"><div class="stat-value" id="reportWorst">-</div><div class="stat-label">Worst Day</div></div>
+      <div class="stat-card"><div class="stat-value" id="reportDays">0</div><div class="stat-label">Days Tracked</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Hours by Phase</div>
+      <div class="chart-container"><canvas id="reportPhaseChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Daily Breakdown</div>
+      <div class="chart-container"><canvas id="reportDailyChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Study Heatmap (Last 30 Days)</div>
+      <div id="heatmapContainer" class="heatmap" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Action Button -->
+<button class="fab" id="fabBtn" onclick="toggleQuickMenu()">+</button>
+<div id="quickMenu" class="quick-menu hidden">
+  <button class="quick-btn" style="background:var(--green);" onclick="quickLogTime()">⏱ Quick Log Time</button>
+  <button class="quick-btn" style="background:var(--blue);" onclick="showAddSchedule()">📅 Add Schedule</button>
+  <button class="quick-btn" style="background:var(--purple);" onclick="openJournalTab()">📝 Quick Note</button>
+</div>
+
+<!-- Modal container -->
+<div id="modalContainer"></div>
+
+<script>
+// ============ CONFIGURATION ============
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3000'
+  : ''; // In production, set your Render URL here
+
+// ============ GLOBAL STATE ============
+let state = { phases: [], activities: [], projects: [], books: [], schedule: [], logs: [] };
+let timerInterval = null;
+let timerSeconds = 25 * 60;
+let timerRunning = false;
+let timerPhaseId = null;
+
+// ============ PWA INSTALL ============
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.remove('hidden');
+});
+async function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const result = await deferredPrompt.userChoice;
+  if (result.outcome === 'accepted') {
+    document.getElementById('installBanner').classList.add('hidden');
+  }
+  deferredPrompt = null;
+}
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js');
+  });
+}
+
+// ============ API HELPERS ============
+async function api(path, options = {}) {
+  const url = API_BASE + '/api' + path;
+  const config = {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  };
+  try {
+    const res = await fetch(url, config);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error(`API error (${path}):`, err);
+    return null;
+  }
+}
+
+// ============ TAB SWITCHING ============
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+    loadTabData(tab.dataset.tab);
+  });
+});
+
+function loadTabData(tab) {
+  switch(tab) {
+    case 'dashboard': loadDashboard(); break;
+    case 'schedule': loadSchedule(); break;
+    case 'timer': loadTimerData(); break;
+    case 'phases': loadPhasesTab(); break;
+    case 'projects': loadProjects(); break;
+    case 'books': loadBooks(); break;
+    case 'journal': loadJournal(); break;
+    case 'report': loadReport(); break;
+  }
+}
+
+// ============ DASHBOARD ============
+async function loadDashboard() {
+  const data = await api('/dashboard');
+  if (!data) return;
+
+  document.getElementById('dashToday').textContent = data.today_minutes || 0;
+  document.getElementById('dashWeek').textContent = data.week_total_hours || '0';
+  document.getElementById('dashStreak').textContent = data.streak || 0;
+
+  // Overall progress
+  let totalWeight = 0, completedWeight = 0;
+  if (data.phase_progress) {
+    data.phase_progress.forEach(p => {
+      const pct = p.total_activities > 0 ? (p.completed_activities / p.total_activities) * 100 : 0;
+      completedWeight += pct * (p.weight || 5);
+      totalWeight += (p.weight || 5);
+    });
+  }
+  const overallPct = totalWeight > 0 ? Math.round(completedWeight / totalWeight) : 0;
+  document.getElementById('dashProgress').textContent = overallPct + '%';
+  document.getElementById('streakBadge').textContent = data.streak > 0 ? '🔥' : '';
+
+  // Today's schedule
+  const todayEl = document.getElementById('todaySchedule');
+  if (data.today_schedule && data.today_schedule.length > 0) {
+    todayEl.innerHTML = data.today_schedule.map(s => `
+      <div class="sched-item">
+        <div class="sched-color" style="background:${s.color || '#4a90d9'}"></div>
+        <div class="sched-time">${formatTime(s.start_time)}</div>
+        <div><div class="sched-title">${s.title}</div><div class="sched-subject">${s.category || 'Study'}</div></div>
+      </div>
+    `).join('');
+  } else {
+    todayEl.innerHTML = '<div class="empty">No sessions today</div>';
+  }
+
+  // Upcoming
+  const upEl = document.getElementById('upcomingSchedule');
+  if (data.upcoming && data.upcoming.length > 0) {
+    upEl.innerHTML = data.upcoming.map(s => {
+      const d = new Date(s.start_time);
+      const day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      return `
+      <div class="sched-item">
+        <div class="sched-color" style="background:${s.color || '#4a90d9'}"></div>
+        <div><div class="sched-time">${day}</div><div class="sched-time">${formatTime(s.start_time)}</div></div>
+        <div><div class="sched-title">${s.title}</div><div class="sched-subject">${s.category || 'Study'}</div></div>
+      </div>`;
+    }).join('');
+  } else {
+    upEl.innerHTML = '<div class="empty">Nothing upcoming</div>';
+  }
+
+  // Phase progress list
+  const ppEl = document.getElementById('phaseProgressList');
+  if (data.phase_progress) {
+    ppEl.innerHTML = data.phase_progress.map(p => {
+      const pct = p.total_activities > 0 ? Math.round((p.completed_activities / p.total_activities) * 100) : 0;
+      return `<div class="phase-item">
+        <div class="phase-header"><span class="phase-name">${p.name}</span><span class="phase-pct">${pct}%</span></div>
+        <div class="phase-bar"><div class="phase-fill" style="width:${pct}%;background:${p.color || '#4a90d9'}"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Weekly chart
+  renderWeeklyChart(data.weekly_totals);
+}
+
+let weeklyChartInstance = null;
+function renderWeeklyChart(data) {
+  const ctx = document.getElementById('weeklyChart').getContext('2d');
+  if (weeklyChartInstance) weeklyChartInstance.destroy();
+  if (!data || data.length === 0) {
+    weeklyChartInstance = new Chart(ctx, {
+      type: 'bar', data: { labels: ['No data'], datasets: [{ label: 'Minutes', data: [0], backgroundColor: '#4f46e5' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+    return;
+  }
+  weeklyChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(d => { const dt = new Date(d.date); return dt.toLocaleDateString('en-US', { weekday: 'short' }); }),
+      datasets: [{ label: 'Minutes', data: data.map(d => parseInt(d.minutes)), backgroundColor: '#4f46e5', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8' } } }
+    }
+  });
+}
+
+// ============ SCHEDULE ============
+async function loadSchedule() {
+  const start = document.getElementById('scheduleStart').value;
+  const end = document.getElementById('scheduleEnd').value;
+  let url = '/schedule';
+  if (start && end) url += `?start=${start}&end=${end}`;
+  else if (start) url += `?start=${start}`;
+  
+  // Default to current week if no dates
+  if (!start && !end) {
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    document.getElementById('scheduleStart').value = weekStart.toISOString().split('T')[0];
+    document.getElementById('scheduleEnd').value = weekEnd.toISOString().split('T')[0];
+    url = `/schedule?start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`;
+  }
+
+  const data = await api(url);
+  if (!data) return;
+
+  const el = document.getElementById('scheduleList');
+  if (data.length === 0) {
+    el.innerHTML = '<div class="empty">No schedule items in this range</div>';
+    return;
+  }
+
+  // Group by date
+  const groups = {};
+  data.forEach(s => {
+    const d = new Date(s.start_time).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(s);
+  });
+
+  el.innerHTML = Object.entries(groups).map(([date, items]) => `
+    <div style="margin-bottom:12px;">
+      <div style="font-weight:600;font-size:0.85rem;color:var(--text2);margin-bottom:6px;">${date}</div>
+      ${items.map(s => `
+        <div class="sched-item" style="cursor:pointer;" onclick="showEditSchedule('${s.id}')">
+          <div class="sched-color" style="background:${s.color || '#4a90d9'}"></div>
+          <div class="sched-time">${formatTime(s.start_time)}-${formatTime(s.end_time)}</div>
+          <div style="flex:1;"><div class="sched-title">${s.title}</div><div class="sched-subject">${s.category || 'Study'}${s.subject ? ' · ' + s.subject : ''}</div></div>
+          <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();deleteSchedule('${s.id}')">✕</button>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+async function deleteSchedule(id) {
+  if (!confirm('Delete this schedule item?')) return;
+  await api('/schedule/' + id, { method: 'DELETE' });
+  loadSchedule();
+}
+
+function showAddSchedule() {
+  showModal('Add Schedule Item', `
+    <input type="text" id="modalTitle" placeholder="Title (e.g., Study Portfolio Theory)" />
+    <select id="modalPhase"><option value="">No phase</option></select>
+    <input type="datetime-local" id="modalStart" />
+    <input type="datetime-local" id="modalEnd" />
+    <select id="modalCategory">
+      <option value="study">Study</option>
+      <option value="MBA Class">MBA Class</option>
+      <option value="project">Project</option>
+      <option value="interview">Interview Prep</option>
+      <option value="other">Other</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveSchedule()">Save</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  // Populate phases
+  const sel = document.getElementById('modalPhase');
+  state.phases.forEach(p => {
+    sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+  });
+  // Default times
+  const now = new Date();
+  document.getElementById('modalStart').value = now.toISOString().slice(0, 16);
+  const end = new Date(now.getTime() + 60 * 60000);
+  document.getElementById('modalEnd').value = end.toISOString().slice(0, 16);
+}
+
+async function saveSchedule() {
+  const data = {
+    title: document.getElementById('modalTitle').value,
+    phase_id: document.getElementById('modalPhase').value || null,
+    start_time: document.getElementById('modalStart').value,
+    end_time: document.getElementById('modalEnd').value,
+    category: document.getElementById('modalCategory').value
+  };
+  if (!data.title || !data.start_time) return alert('Title and time required');
+  await api('/schedule', { method: 'POST', body: JSON.stringify(data) });
+  closeModal();
+  loadSchedule();
+  loadDashboard();
+}
+
+async function showEditSchedule(id) {
+  const items = await api('/schedule');
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+
+  showModal('Edit Schedule Item', `
+    <input type="text" id="modalTitle" value="${item.title}" />
+    <select id="modalPhase"><option value="">No phase</option></select>
+    <input type="datetime-local" id="modalStart" value="${item.start_time.slice(0, 16)}" />
+    <input type="datetime-local" id="modalEnd" value="${item.end_time.slice(0, 16)}" />
+    <select id="modalCategory">
+      <option value="study" ${item.category === 'study' ? 'selected' : ''}>Study</option>
+      <option value="MBA Class" ${item.category === 'MBA Class' ? 'selected' : ''}>MBA Class</option>
+      <option value="project" ${item.category === 'project' ? 'selected' : ''}>Project</option>
+      <option value="interview" ${item.category === 'interview' ? 'selected' : ''}>Interview Prep</option>
+      <option value="other" ${item.category === 'other' ? 'selected' : ''}>Other</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="updateSchedule('${id}')">Update</button>
+      <button class="btn btn-danger" onclick="deleteSchedule('${id}');closeModal();">Delete</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  const sel = document.getElementById('modalPhase');
+  state.phases.forEach(p => {
+    sel.innerHTML += `<option value="${p.id}" ${p.id === item.phase_id ? 'selected' : ''}>${p.name}</option>`;
+  });
+}
+
+async function updateSchedule(id) {
+  const data = {
+    title: document.getElementById('modalTitle').value,
+    phase_id: document.getElementById('modalPhase').value || null,
+    start_time: document.getElementById('modalStart').value,
+    end_time: document.getElementById('modalEnd').value,
+    category: document.getElementById('modalCategory').value
+  };
+  await api('/schedule/' + id, { method: 'PUT', body: JSON.stringify(data) });
+  closeModal();
+  loadSchedule();
+}
+
+// ============ TIMER ============
+function loadTimerData() {
+  const sel = document.getElementById('timerPhase');
+  const logSel = document.getElementById('logPhase');
+  sel.innerHTML = '<option value="">Select phase...</option>';
+  logSel.innerHTML = '<option value="">Select phase...</option>';
+  state.phases.forEach(p => {
+    sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+    logSel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+  });
+  loadRecentLogs();
+}
+
+function toggleTimer() {
+  const btn = document.getElementById('timerBtn');
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    btn.textContent = 'Resume';
+    // Log time if at least 1 minute passed
+  } else {
+    timerRunning = true;
+    btn.textContent = 'Pause';
+    timerInterval = setInterval(() => {
+      timerSeconds--;
+      updateTimerDisplay();
+      if (timerSeconds <= 0) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        btn.textContent = 'Start';
+        timerComplete();
+      }
+    }, 1000);
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  const mode = document.getElementById('timerMode').value;
+  if (mode === 'focus') timerSeconds = 25 * 60;
+  else if (mode === 'short') timerSeconds = 5 * 60;
+  else timerSeconds = 15 * 60;
+  updateTimerDisplay();
+  document.getElementById('timerBtn').textContent = 'Start';
+  document.getElementById('timerStatus').textContent = 'Ready';
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timerSeconds / 60);
+  const s = timerSeconds % 60;
+  document.getElementById('timerDisplay').textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+async function timerComplete() {
+  const phaseId = document.getElementById('timerPhase').value;
+  const mode = document.getElementById('timerMode').value;
+  const minutes = mode === 'focus' ? 25 : mode === 'short' ? 5 : 15;
+  
+  document.getElementById('timerStatus').textContent = `✅ Completed ${minutes} min session!`;
+  
+  if (phaseId) {
+    await api('/time-logs', {
+      method: 'POST',
+      body: JSON.stringify({ phase_id: phaseId, duration_minutes: minutes, source: 'pomodoro', notes: 'Pomodoro session' })
+    });
+    loadRecentLogs();
+    loadDashboard();
+  }
+}
+
+document.getElementById('timerMode').addEventListener('change', resetTimer);
+
+async function logTime() {
+  const phaseId = document.getElementById('logPhase').value;
+  const minutes = parseInt(document.getElementById('logMinutes').value);
+  if (!phaseId || !minutes || minutes <= 0) return alert('Select phase and enter minutes');
+  
+  await api('/time-logs', {
+    method: 'POST',
+    body: JSON.stringify({ phase_id: phaseId, duration_minutes: minutes, source: 'manual' })
+  });
+  document.getElementById('logMinutes').value = '';
+  loadRecentLogs();
+  loadDashboard();
+}
+
+async function loadRecentLogs() {
+  const data = await api('/time-logs');
+  if (!data) return;
+  const recent = data.slice(0, 5);
+  const el = document.getElementById('recentLogs');
+  el.innerHTML = recent.length === 0 
+    ? '<div style="color:var(--text2);font-size:0.85rem;">No logs yet</div>'
+    : recent.map(l => `<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:4px 0;border-bottom:1px solid var(--bg3);">
+      <span style="color:${l.phase_color}">${l.phase_name || 'Unknown'}</span>
+      <span>${l.duration_minutes} min</span>
+    </div>`).join('');
+}
+
+// ============ PHASES TAB ============
+async function loadPhasesTab() {
+  const el = document.getElementById('allPhasesList');
+  const filterSel = document.getElementById('activityPhaseFilter');
+  filterSel.innerHTML = '<option value="">All phases</option>';
+  
+  let html = '';
+  const phases = await api('/phases');
+  if (!phases) return;
+  
+  phases.forEach(p => {
+    filterSel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+    html += `<div class="phase-item" style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bg3);">
+      <div class="phase-header">
+        <span class="phase-name" style="color:${p.color}">${p.name}</span>
+        <span class="phase-pct">${p.duration_weeks ? p.duration_weeks + ' wk' : 'Ongoing'} · ${p.hours_per_week || '—'} hr/wk</span>
+      </div>
+      <div style="font-size:0.8rem;color:var(--text2);margin:4px 0;">${p.description || ''}</div>
+    </div>`;
+  });
+  el.innerHTML = html;
+  loadActivities();
+}
+
+async function loadActivities() {
+  const phaseId = document.getElementById('activityPhaseFilter').value;
+  const url = phaseId ? `/activities?phase_id=${phaseId}` : '/activities';
+  const data = await api(url);
+  if (!data) return;
+  
+  const el = document.getElementById('activitiesList');
+  if (data.length === 0) {
+    el.innerHTML = '<div class="empty">No activities found</div>';
+    return;
+  }
+
+  // Group by category
+  const groups = {};
+  data.forEach(a => {
+    if (!groups[a.category]) groups[a.category] = [];
+    groups[a.category].push(a);
+  });
+
+  el.innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <div style="margin-bottom:12px;">
+      <div style="font-weight:600;font-size:0.8rem;color:var(--accent);text-transform:uppercase;margin-bottom:4px;">${cat}</div>
+      ${items.map(a => {
+        const pct = a.estimated_minutes ? Math.min(100, Math.round(60 / a.estimated_minutes * 100)) : 0;
+        return `<div class="check-item">
+          <div class="check-box ${a.status === 'completed' ? 'checked' : ''}" onclick="toggleActivity('${a.id}')"></div>
+          <div style="flex:1;">
+            <div class="check-label ${a.status === 'completed' ? 'done' : ''}">${a.name}</div>
+            <div style="display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;">
+              ${a.resource_url ? `<a href="${a.resource_url}" target="_blank" style="font-size:0.7rem;color:var(--blue);">🔗 ${a.resource_name || 'Link'}</a>` : ''}
+              ${a.estimated_minutes ? `<span style="font-size:0.7rem;color:var(--text2);">⏱ ${a.estimated_minutes} min</span>` : ''}
+            </div>
+          </div>
+          <span class="check-category">${a.sub_category || ''}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+async function toggleActivity(id) {
+  const data = await api('/activities/' + id, {
+    method: 'PUT',
+    body: JSON.stringify({ status: 'completed' })
+  });
+  loadActivities();
+  loadDashboard();
+}
+
+// ============ PROJECTS ============
+async function loadProjects() {
+  const data = await api('/projects');
+  if (!data) return;
+  const el = document.getElementById('projectsList');
+  if (data.length === 0) { el.innerHTML = '<div class="empty">No projects</div>'; return; }
+
+  const categories = {};
+  data.forEach(p => {
+    if (!categories[p.category]) categories[p.category] = [];
+    categories[p.category].push(p);
+  });
+
+  el.innerHTML = Object.entries(categories).map(([cat, items]) => `
+    <div style="margin-bottom:12px;">
+      <div style="font-weight:600;font-size:0.8rem;color:var(--accent);text-transform:uppercase;margin-bottom:4px;">${cat}</div>
+      ${items.map(p => `<div class="check-item">
+        <div class="check-box ${p.is_completed ? 'checked' : ''}" onclick="toggleProject('${p.id}')"></div>
+        <div class="check-label ${p.is_completed ? 'done' : ''}">${p.name}</div>
+        ${p.notes ? `<span style="font-size:0.75rem;color:var(--text2);">${p.notes}</span>` : ''}
+      </div>`).join('')}
+    </div>
+  `).join('');
+}
+
+async function toggleProject(id) {
+  const data = await api('/projects/' + id, {
+    method: 'PUT',
+    body: JSON.stringify({ is_completed: true })
+  });
+  loadProjects();
+  loadDashboard();
+}
+
+// ============ BOOKS ============
+async function loadBooks() {
+  const phaseId = document.getElementById('bookPhaseFilter').value;
+  const url = phaseId ? `/books?phase_id=${phaseId}` : '/books';
+  const data = await api(url);
+  if (!data) return;
+  
+  const el = document.getElementById('booksList');
+  if (data.length === 0) { el.innerHTML = '<div class="empty">No books</div>'; return; }
+
+  el.innerHTML = data.map(b => `
+    <div class="check-item">
+      <div style="flex:1;">
+        <div class="check-label">${b.title}</div>
+        <div style="font-size:0.75rem;color:var(--text2);">${b.author || ''} ${b.phase_name ? '· ' + b.phase_name : ''}</div>
+      </div>
+      <select onchange="updateBook('${b.id}', this.value)" style="width:auto;padding:4px 8px;font-size:0.8rem;margin:0;">
+        <option value="not_started" ${b.status === 'not_started' ? 'selected' : ''}>📖 Not Started</option>
+        <option value="reading" ${b.status === 'reading' ? 'selected' : ''}>📚 Reading</option>
+        <option value="completed" ${b.status === 'completed' ? 'selected' : ''}>✅ Done</option>
+      </select>
+    </div>
+  `).join('');
+}
+
+async function updateBook(id, status) {
+  await api('/books/' + id, { method: 'PUT', body: JSON.stringify({ status }) });
+}
+
+// ============ JOURNAL ============
+async function saveJournal() {
+  const content = document.getElementById('journalContent').value;
+  const mood = document.getElementById('journalMood').value;
+  const phase_id = document.getElementById('journalPhase').value || null;
+  if (!content) return alert('Write something first');
+  
+  await api('/journal', {
+    method: 'POST',
+    body: JSON.stringify({ content, mood, phase_id })
+  });
+  document.getElementById('journalContent').value = '';
+  loadJournal();
+}
+
+async function loadJournal() {
+  const data = await api('/journal?limit=10');
+  if (!data) return;
+  const el = document.getElementById('journalList');
+  if (data.length === 0) { el.innerHTML = '<div class="empty">No entries yet</div>'; return; }
+  
+  el.innerHTML = data.map(j => `
+    <div style="padding:10px 0;border-bottom:1px solid var(--bg3);">
+      <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text2);margin-bottom:4px;">
+        <span>${j.mood || ''} ${new Date(j.created_at).toLocaleString()}</span>
+        <span>${j.phase_name || ''}</span>
+      </div>
+      <div style="font-size:0.9rem;">${j.content}</div>
+    </div>
+  `).join('');
+  
+  // Populate phase select
+  const sel = document.getElementById('journalPhase');
+  sel.innerHTML = '<option value="">General</option>';
+  state.phases.forEach(p => { sel.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
+}
+
+// ============ REPORT ============
+let reportPhaseChart = null, reportDailyChart = null;
+
+async function loadReport() {
+  const data = await api('/weekly-report');
+  if (!data) return;
+
+  document.getElementById('reportTotal').textContent = data.total_hours || '0';
+  document.getElementById('reportBest').textContent = data.best_day ? formatDate(data.best_day.date) + ' (' + Math.round(data.best_day.minutes/60*10)/10 + 'h)' : '-';
+  document.getElementById('reportWorst').textContent = data.worst_day ? formatDate(data.worst_day.date) + ' (' + Math.round(data.worst_day.minutes/60*10)/10 + 'h)' : '-';
+  document.getElementById('reportDays').textContent = data.daily_breakdown ? data.daily_breakdown.length : 0;
+
+  // Phase breakdown chart
+  const ctx1 = document.getElementById('reportPhaseChart').getContext('2d');
+  if (reportPhaseChart) reportPhaseChart.destroy();
+  if (data.phase_breakdown && data.phase_breakdown.length > 0) {
+    reportPhaseChart = new Chart(ctx1, {
+      type: 'doughnut',
+      data: {
+        labels: data.phase_breakdown.map(p => p.name),
+        datasets: [{
+          data: data.phase_breakdown.map(p => parseInt(p.minutes)),
+          backgroundColor: data.phase_breakdown.map(p => p.color || '#4f46e5')
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }
+    });
+  }
+
+  // Daily chart
+  const ctx2 = document.getElementById('reportDailyChart').getContext('2d');
+  if (reportDailyChart) reportDailyChart.destroy();
+  if (data.daily_breakdown && data.daily_breakdown.length > 0) {
+    reportDailyChart = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: data.daily_breakdown.map(d => { const dt = new Date(d.date); return dt.toLocaleDateString('en-US', { weekday: 'short' }); }),
+        datasets: [{ label: 'Minutes', data: data.daily_breakdown.map(d => parseInt(d.minutes)), backgroundColor: '#4f46e5', borderRadius: 4 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8' } } } }
+    });
+  }
+
+  // Heatmap
+  loadHeatmap();
+}
+
+async function loadHeatmap() {
+  const data = await api('/streaks');
+  if (!data || !data.heatmap_data) return;
+  const el = document.getElementById('heatmapContainer');
+  const max = Math.max(...data.heatmap_data.map(d => parseInt(d.minutes)), 1);
+  el.innerHTML = data.heatmap_data.map(d => {
+    const m = parseInt(d.minutes);
+    let level = 'l0';
+    if (m === 0) level = '';
+    else if (m <= max * 0.25) level = 'l1';
+    else if (m <= max * 0.5) level = 'l2';
+    else if (m <= max * 0.75) level = 'l3';
+    else level = 'l4';
+    return `<div class="heat-cell ${level}" title="${d.date}: ${m} min"></div>`;
+  }).join('');
+}
+
+// ============ QUICK MENU ============
+function toggleQuickMenu() {
+  const menu = document.getElementById('quickMenu');
+  menu.classList.toggle('hidden');
+}
+
+function quickLogTime() {
+  toggleQuickMenu();
+  document.querySelector('[data-tab="timer"]').click();
+  document.getElementById('logMinutes').focus();
+}
+
+function openJournalTab() {
+  toggleQuickMenu();
+  document.querySelector('[data-tab="journal"]').click();
+  document.getElementById('journalContent').focus();
+}
+
+// ============ MODAL ============
+function showModal(title, content) {
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <h3>${title}</h3>
+        ${content}
+      </div>
+    </div>
+  `;
+}
+
+function closeModal() {
+  document.getElementById('modalContainer').innerHTML = '';
+}
+
+// ============ UTILITY ============
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// Set header date
+document.getElementById('headerDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+// ============ REFRESH ============
+async function refreshAll() {
+  state.phases = await api('/phases') || [];
+  loadDashboard();
+  const activeTab = document.querySelector('.tab.active');
+  if (activeTab) loadTabData(activeTab.dataset.tab);
+}
+
+// ============ INIT ============
+async function init() {
+  state.phases = await api('/phases') || [];
+  state.projects = await api('/projects') || [];
+  state.books = await api('/books') || [];
+  refreshAll();
+  
+  // Set up phase selects
+  const selects = ['timerPhase', 'logPhase', 'modalPhase'];
+  selects.forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) {
+      sel.innerHTML = '<option value="">Select phase...</option>';
+      state.phases.forEach(p => {
+        sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+      });
+    }
+  });
+
+  // Activity filter
+  const af = document.getElementById('activityPhaseFilter');
+  af.innerHTML = '<option value="">All phases</option>';
+  state.phases.forEach(p => { af.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
+
+  // Book filter
+  const bf = document.getElementById('bookPhaseFilter');
+  bf.innerHTML = '<option value="">All phases</option>';
+  state.phases.forEach(p => { bf.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
