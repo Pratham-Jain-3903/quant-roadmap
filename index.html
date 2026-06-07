@@ -164,6 +164,7 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
   <div class="tabs" id="tabs">
     <button class="tab active" data-tab="dashboard">Dashboard</button>
     <button class="tab" data-tab="schedule">Schedule</button>
+    <button class="tab" data-tab="plate">Today's Plate</button>
     <button class="tab" data-tab="timer">Timer</button>
     <button class="tab" data-tab="phases">Phases</button>
     <button class="tab" data-tab="projects">Projects</button>
@@ -199,6 +200,35 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
     <div class="card">
       <div class="card-title">Phase Progress</div>
       <div id="phaseProgressList"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB: TODAY'S PLATE / QUEST LOG ============ -->
+  <div id="tab-plate" class="tab-content hidden">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value" id="plateUnlocked">0</div><div class="stat-label">Unlocked Quests</div></div>
+      <div class="stat-card"><div class="stat-value" id="plateCount">0</div><div class="stat-label">On Plate Today</div></div>
+      <div class="stat-card"><div class="stat-value" id="activeTaskBudget">0%</div><div class="stat-label">Active Task Budget</div></div>
+      <div class="stat-card"><div class="stat-value" id="timelineWeeks">--</div><div class="stat-label">Weeks Remaining</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Active Quest Timer</div>
+      <div id="activeQuestName" style="font-weight:700;margin-bottom:6px;">No active task</div>
+      <div id="activeQuestMeta" style="font-size:0.8rem;color:var(--text2);margin-bottom:8px;">Click Start on any quest below.</div>
+      <div class="timer-display" id="taskTimerDisplay">00:00</div>
+      <div class="progress-bar"><div class="progress-fill" id="taskTimerBudgetBar" style="width:0%;"></div></div>
+      <div class="timer-controls" style="margin-top:10px;">
+        <button class="btn btn-primary" onclick="toggleTaskTimer()" id="taskTimerBtn" disabled>Start</button>
+        <button class="btn btn-outline" onclick="stopAndLogTaskTimer()" id="taskStopBtn" disabled>Stop & Log</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Today's Auto-Scheduled Plate</div>
+      <div id="todaysPlateList"><div class="empty">Loading today's quests...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Dynamic Roadmap Timeline</div>
+      <div id="timelineProjection"><div class="empty">Loading projections...</div></div>
     </div>
   </div>
 
@@ -345,6 +375,10 @@ let timerInterval = null;
 let timerSeconds = 25 * 60;
 let timerRunning = false;
 let timerPhaseId = null;
+let activeTask = null;
+let taskTimerInterval = null;
+let taskTimerSeconds = 0;
+let taskTimerRunning = false;
 
 // ============ PWA INSTALL ============
 let deferredPrompt = null;
@@ -401,6 +435,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 function loadTabData(tab) {
   switch(tab) {
     case 'dashboard': loadDashboard(); break;
+    case 'plate': loadTodaysPlate(); break;
     case 'schedule': loadSchedule(); break;
     case 'timer': loadTimerData(); break;
     case 'phases': loadPhasesTab(); break;
@@ -985,6 +1020,198 @@ async function loadHeatmap() {
     else level = 'l4';
     return `<div class="heat-cell ${level}" title="${d.date}: ${m} min"></div>`;
   }).join('');
+}
+
+// ============ TODAY'S PLATE / DAG QUEST LOG ============
+function minutesLabel(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h <= 0 ? `${m}m` : `${h}h ${m}m`;
+}
+
+function hhmmToDisplay(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date(); d.setHours(h, m, 0, 0);
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function safeAttr(v) {
+  return String(v || '').replace(/&/g, '&').replace(/'/g, '&#39;').replace(/"/g, '"').replace(/</g, '<');
+}
+
+async function loadTodaysPlate() {
+  const [plate, timeline] = await Promise.all([
+    api('/daily-plan'),
+    api('/projected-timeline')
+  ]);
+  renderTodaysPlate(plate);
+  renderTimelineProjection(timeline);
+}
+
+function renderTodaysPlate(data) {
+  if (!data) return;
+  document.getElementById('plateUnlocked').textContent = data.unlocked_count || 0;
+  document.getElementById('plateCount').textContent = data.plan_count || 0;
+  const el = document.getElementById('todaysPlateList');
+  if (!data.plan || data.plan.length === 0) {
+    el.innerHTML = '<div class="empty">No quests fit today. Try freeing time.</div>';
+    return;
+  }
+  el.innerHTML = data.plan.map(q => {
+    const qJson = safeAttr(JSON.stringify(q));
+    const phaseName = safeAttr(q.phase_name);
+    const actName = safeAttr(q.activity_name);
+    return `<div class="sched-item" style="align-items:flex-start;flex-wrap:wrap;">
+      <div class="sched-color" style="background:${q.phase_color || '#4f46e5'}"></div>
+      <div class="sched-time">${hhmmToDisplay(q.start_time)}<br>→ ${hhmmToDisplay(q.end_time)}</div>
+      <div style="flex:1;min-width:200px;">
+        <div class="sched-title">🎯 ${actName}</div>
+        <div class="sched-subject">${phaseName} · ${safeAttr(q.category)} · ${minutesLabel(q.estimated_minutes || q.duration)} · ${'★'.repeat(q.difficulty || 1)}</div>
+        ${q.resource_url ? `<a href="${q.resource_url}" target="_blank" style="font-size:0.75rem;color:var(--blue);">🔗 ${safeAttr(q.resource_name || 'Resource')}</a>` : ''}
+        <div class="progress-bar" style="margin-top:8px;"><div class="progress-fill" id="budget-${q.activity_id}" style="width:0%;background:${q.phase_color || '#4f46e5'}"></div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+          <button class="btn btn-primary btn-sm" data-quest='${qJson}' onclick="startQuestFromBtn(this)">⏱ Start Timer</button>
+          <button class="btn btn-outline btn-sm" onclick="openReflectionModal('${q.activity_id}', '${actName}')">✅ Complete + Recall</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  data.plan.forEach(loadQuestBudget);
+}
+
+function startQuestFromBtn(btn) {
+  startQuest(JSON.parse(btn.dataset.quest));
+}
+
+async function loadQuestBudget(q) {
+  const stats = await api('/activity-time/' + q.activity_id);
+  const bar = document.getElementById('budget-' + q.activity_id);
+  if (bar && stats) {
+    const pct = Math.min(100, stats.percent_complete || 0);
+    bar.style.width = pct + '%';
+    bar.title = `${stats.total_tracked_minutes || 0}m / ${stats.budget_minutes || 0}m`;
+  }
+}
+
+function renderTimelineProjection(data) {
+  if (!data) return;
+  document.getElementById('timelineWeeks').textContent = data.avg_weekly_hours > 0 ? Math.round(data.overall_remaining_hours / data.avg_weekly_hours) : '--';
+  const el = document.getElementById('timelineProjection');
+  el.innerHTML = `
+    <div style="font-size:0.85rem;color:var(--text2);margin-bottom:10px;">${safeAttr(data.summary)}</div>
+    ${(data.projections || []).slice(0, 5).map(p => `
+      <div class="phase-item">
+        <div class="phase-header"><span class="phase-name" style="color:${p.color}">${safeAttr(p.phase_name)}</span><span class="phase-pct">${p.percent_complete}% · ${p.projected_weeks_remaining} wk left</span></div>
+        <div class="phase-bar"><div class="phase-fill" style="width:${p.percent_complete}%;background:${p.color}"></div></div>
+        <div style="font-size:0.72rem;color:var(--text2);margin-top:3px;">${p.remaining_hours}h remaining · ${p.pace === 'behind' ? '⚠️ behind' : p.pace === 'on_track' ? '🟢 on track' : '⏳ start logging time'}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function startQuest(q) {
+  if (taskTimerRunning && activeTask && activeTask.activity_id !== q.activity_id) {
+    alert('Stop and log the current quest timer first.');
+    return;
+  }
+  activeTask = q;
+  taskTimerSeconds = 0;
+  taskTimerRunning = false;
+  document.getElementById('activeQuestName').textContent = q.activity_name;
+  document.getElementById('activeQuestMeta').textContent = `${q.phase_name} · Budget ${minutesLabel(q.estimated_minutes || q.duration)}`;
+  document.getElementById('taskTimerBtn').disabled = false;
+  document.getElementById('taskStopBtn').disabled = false;
+  document.getElementById('taskTimerBtn').textContent = 'Start';
+  updateTaskTimerDisplay();
+}
+
+function toggleTaskTimer() {
+  if (!activeTask) return;
+  if (taskTimerRunning) {
+    clearInterval(taskTimerInterval);
+    taskTimerRunning = false;
+    document.getElementById('taskTimerBtn').textContent = 'Resume';
+  } else {
+    taskTimerRunning = true;
+    document.getElementById('taskTimerBtn').textContent = 'Pause';
+    taskTimerInterval = setInterval(() => {
+      taskTimerSeconds++;
+      updateTaskTimerDisplay();
+    }, 1000);
+  }
+}
+
+function updateTaskTimerDisplay() {
+  const m = Math.floor(taskTimerSeconds / 60);
+  const s = taskTimerSeconds % 60;
+  document.getElementById('taskTimerDisplay').textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const budget = (activeTask && (activeTask.estimated_minutes || activeTask.duration)) || 1;
+  const pct = Math.min(150, Math.round((taskTimerSeconds / 60) / budget * 100));
+  document.getElementById('activeTaskBudget').textContent = pct + '%';
+  const bar = document.getElementById('taskTimerBudgetBar');
+  bar.style.width = Math.min(100, pct) + '%';
+  bar.style.background = pct < 80 ? 'var(--green)' : pct <= 100 ? 'var(--orange)' : 'var(--red)';
+}
+
+async function stopAndLogTaskTimer() {
+  if (!activeTask) return;
+  clearInterval(taskTimerInterval);
+  taskTimerRunning = false;
+  const mins = Math.max(1, Math.round(taskTimerSeconds / 60));
+  await api('/time-logs', {
+    method: 'POST',
+    body: JSON.stringify({
+      activity_id: activeTask.activity_id,
+      duration_minutes: mins,
+      source: 'quest_timer',
+      notes: `Quest timer: ${activeTask.activity_name}`
+    })
+  });
+  alert(`Logged ${mins} minutes against: ${activeTask.activity_name}`);
+  taskTimerSeconds = 0;
+  activeTask = null;
+  document.getElementById('activeQuestName').textContent = 'No active task';
+  document.getElementById('activeQuestMeta').textContent = 'Click Start on any quest below.';
+  document.getElementById('taskTimerBtn').disabled = true;
+  document.getElementById('taskStopBtn').disabled = true;
+  document.getElementById('taskTimerBtn').textContent = 'Start';
+  updateTaskTimerDisplay();
+  loadTodaysPlate();
+}
+
+function openReflectionModal(activityId, activityName) {
+  showModal('Complete Quest + Recall', `
+    <div style="font-size:0.9rem;margin-bottom:10px;">Before moving on, write what you learned from:<br><strong>${activityName}</strong></div>
+    <textarea id="reflectionContent" placeholder="What did you understand? What was tricky? How would you explain it tomorrow?" style="min-height:120px;"></textarea>
+    <input id="reflectionTakeaways" placeholder="Key takeaways separated by commas" />
+    <select id="reflectionDifficulty">
+      <option value="1">Difficulty: 1 - Easy</option>
+      <option value="2">Difficulty: 2</option>
+      <option value="3" selected>Difficulty: 3 - Medium</option>
+      <option value="4">Difficulty: 4</option>
+      <option value="5">Difficulty: 5 - Hard</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="completeQuestWithReflection('${activityId}')">Save Recall + Complete</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+async function completeQuestWithReflection(activityId) {
+  const content = document.getElementById('reflectionContent').value.trim();
+  if (content.length < 20) {
+    alert('Write at least 20 characters of recall before completing.');
+    return;
+  }
+  const takeaways = document.getElementById('reflectionTakeaways').value.split(',').map(x => x.trim()).filter(Boolean);
+  const difficulty = parseInt(document.getElementById('reflectionDifficulty').value);
+  await api('/activities/' + activityId + '/complete', {
+    method: 'POST',
+    body: JSON.stringify({ content, key_takeaways: takeaways, difficulty_rating: difficulty, time_spent_minutes: 0 })
+  });
+  closeModal();
+  loadTodaysPlate();
+  loadDashboard();
 }
 
 // ============ QUICK MENU ============
