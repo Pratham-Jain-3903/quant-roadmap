@@ -426,7 +426,82 @@ app.get('/api/dashboard', async (req, res) => {
 });
 
 // ============================================
-// SEED / MIGRATE / HEALTH
+// REOPEN / UNDO ENDPOINTS
+// ============================================
+app.post('/api/activities/:id/reopen', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(
+      `UPDATE activities SET status = 'pending', completed_at = NULL
+       WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true, activity: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/projects/:id/reopen', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(
+      `UPDATE projects SET is_completed = false, updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true, project: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/books/:id/reopen', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(
+      `UPDATE books SET status = 'not_started', updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true, book: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Recently completed across all entity types (last 30, 7-day window)
+app.get('/api/recently-completed', async (req, res) => {
+  try {
+    const [acts, projs, books] = await Promise.all([
+      db.query(
+        `SELECT 'activity' as kind, a.id, a.name as title, a.completed_at as done_at,
+                p.name as phase_name, p.color as phase_color
+         FROM activities a JOIN phases p ON p.id = a.phase_id
+         WHERE a.status = 'completed' AND a.completed_at >= NOW() - INTERVAL '7 days'
+         ORDER BY a.completed_at DESC LIMIT 10`
+      ),
+      db.query(
+        `SELECT 'project' as kind, id, name as title, updated_at as done_at,
+                NULL as phase_name, '#4f46e5' as phase_color
+         FROM projects
+         WHERE is_completed = true AND updated_at >= NOW() - INTERVAL '7 days'
+         ORDER BY updated_at DESC LIMIT 10`
+      ),
+      db.query(
+        `SELECT 'book' as kind, id, title, updated_at as done_at,
+                p.name as phase_name, p.color as phase_color
+         FROM books LEFT JOIN phases p ON p.id = books.phase_id
+         WHERE status = 'completed' AND updated_at >= NOW() - INTERVAL '7 days'
+         ORDER BY updated_at DESC LIMIT 10`
+      )
+    ]);
+    const combined = [...acts.rows, ...projs.rows, ...books.rows]
+      .sort((a, b) => new Date(b.done_at) - new Date(a.done_at))
+      .slice(0, 10);
+    res.json(combined);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================
+// SEED DATABASE (run schema + seed)
 // ============================================
 app.post('/api/seed', async (req, res) => {
   try {

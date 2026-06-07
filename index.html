@@ -183,6 +183,11 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
     </div>
 
     <div class="card">
+      <div class="card-title">🕐 Recently Completed (last 7 days) — <span style="font-size:0.7rem;text-transform:none;letter-spacing:0;">click ↩ to undo</span></div>
+      <div id="recentlyCompleted"><div class="empty">No completions yet</div></div>
+    </div>
+
+    <div class="card">
       <div class="card-title">Today's Schedule</div>
       <div id="todaySchedule"><div class="empty">No sessions today</div></div>
     </div>
@@ -449,6 +454,7 @@ function loadTabData(tab) {
 // ============ DASHBOARD ============
 async function loadDashboard() {
   const data = await api('/dashboard');
+  loadRecentlyCompleted();
   if (!data) return;
 
   document.getElementById('dashToday').textContent = data.today_minutes || 0;
@@ -1212,6 +1218,55 @@ async function completeQuestWithReflection(activityId) {
   closeModal();
   loadTodaysPlate();
   loadDashboard();
+}
+
+// ============ RECENTLY COMPLETED (with Undo) ============
+async function loadRecentlyCompleted() {
+  const data = await api('/recently-completed');
+  const el = document.getElementById('recentlyCompleted');
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="empty">No completions yet. Mark something ✅ to see it here.</div>';
+    return;
+  }
+  el.innerHTML = data.map(item => {
+    const kindIcon = item.kind === 'activity' ? '🎯' : item.kind === 'project' ? '🔨' : '📕';
+    const phase = item.phase_name ? `<span style="color:${item.phase_color}">· ${safeAttr(item.phase_name)}</span>` : '';
+    const ago = timeAgo(new Date(item.done_at));
+    return `<div class="check-item" id="rc-${item.kind}-${item.id}">
+      <div style="font-size:1.1rem;">${kindIcon}</div>
+      <div style="flex:1;">
+        <div class="check-label done" style="text-decoration:none;font-weight:500;">${safeAttr(item.title)}</div>
+        <div style="font-size:0.7rem;color:var(--text2);">${ago} ${phase}</div>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="confirmUndo('${item.kind}','${item.id}','${safeAttr(item.title)}')">↩ Undo</button>
+    </div>`;
+  }).join('');
+}
+
+function timeAgo(date) {
+  const mins = Math.round((Date.now() - date.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.round(hrs / 24);
+  return `${days}d ago`;
+}
+
+async function confirmUndo(kind, id, title) {
+  if (!confirm(`Undo completion of "${title}"?\n\nTime logs and reflection notes are kept.`)) return;
+  const endpoint = `/api/${kind === 'activity' ? 'activities' : kind === 'project' ? 'projects' : 'books'}/${id}/reopen`;
+  const res = await api(endpoint, { method: 'POST' });
+  if (res && res.success) {
+    // Optimistic UI: remove row immediately
+    const row = document.getElementById(`rc-${kind}-${id}`);
+    if (row) row.remove();
+    // Refresh all related views
+    loadDashboard();
+    loadTodaysPlate();
+  } else {
+    alert('Could not undo. Try again.');
+  }
 }
 
 // ============ QUICK MENU ============
