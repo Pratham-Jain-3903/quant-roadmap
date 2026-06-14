@@ -165,3 +165,4 @@ UPDATE activities SET difficulty = 2 WHERE estimated_minutes > 120 AND estimated
 UPDATE activities SET difficulty = 3 WHERE estimated_minutes > 240 AND estimated_minutes <= 360;
 UPDATE activities SET difficulty = 4 WHERE estimated_minutes > 360 AND estimated_minutes <= 480;
 UPDATE activities SET difficulty = 5 WHERE estimated_minutes > 480;
+ALTER TABLE schedule ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
