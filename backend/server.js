@@ -6,8 +6,83 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+const defaultAllowedOrigins = [
+  'https://pratham-jain-3903.github.io',
+  'http://localhost:3000',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500'
+];
+const allowedOrigins = (process.env.CORS_ORIGINS || defaultAllowedOrigins.join(','))
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  }
+}));
 app.use(express.json());
+
+function requireAdminToken(req, res, next) {
+  const adminToken = process.env.ADMIN_TOKEN;
+  const authHeader = req.get('authorization') || '';
+  const providedToken = req.get('x-admin-token') || authHeader.replace(/^Bearer\s+/i, '');
+
+  if (!adminToken) {
+    return res.status(403).json({ error: 'ADMIN_TOKEN is not configured on the server' });
+  }
+  if (providedToken !== adminToken) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+function difficultyToMastery(difficulty) {
+  const parsed = parseInt(difficulty, 10);
+  if (parsed <= 1) return 85;
+  if (parsed === 2) return 75;
+  if (parsed === 3) return 65;
+  if (parsed === 4) return 50;
+  return 40;
+}
+
+function nextReviewInterval(score) {
+  if (score >= 85) return 14;
+  if (score >= 70) return 7;
+  if (score >= 55) return 3;
+  return 1;
+}
+
+async function refreshSkillMastery(skillTags = []) {
+  const uniqueTags = [...new Set(skillTags.filter(Boolean))];
+  for (const tag of uniqueTags) {
+    await db.query(
+      `INSERT INTO skill_mastery (skill_id, skill_name, score, evidence_count, last_assessed_at, next_review_at, confidence, notes)
+       SELECT
+         $1,
+         INITCAP(REPLACE($1, '_', ' ')),
+         COALESCE(ROUND(AVG(NULLIF(mastery_score,0)))::INTEGER, 0),
+         COUNT(*) FILTER (WHERE evidence_url IS NOT NULL),
+         MAX(COALESCE(last_reviewed_at, completed_at)),
+         MIN(next_review_at),
+         LEAST(100, COUNT(*) FILTER (WHERE status='completed') * 10),
+         'Auto-updated from completed activity evidence.'
+       FROM activities
+       WHERE skill_tags @> ARRAY[$1]::TEXT[]
+       ON CONFLICT (skill_id) DO UPDATE SET
+         score=EXCLUDED.score,
+         evidence_count=EXCLUDED.evidence_count,
+         last_assessed_at=EXCLUDED.last_assessed_at,
+         next_review_at=EXCLUDED.next_review_at,
+         confidence=EXCLUDED.confidence,
+         notes=EXCLUDED.notes,
+         updated_at=NOW()`,
+      [tag]
+    );
+  }
+}
 
 // ============================================
 // PHASES
@@ -64,13 +139,71 @@ app.get('/api/activities', async (req, res) => {
 
 app.put('/api/activities/:id', async (req, res) => {
   try {
-    const { id } = req.params; const { status, notes } = req.body;
+    const { id } = req.params; const {
+      status, notes, skill_tags, mastery_score, evidence_url, assessment_type,
+      pass_criteria, why_this_task, next_review_at, role_track
+    } = req.body;
     const completed_at = status === 'completed' ? new Date() : null;
     const result = await db.query(
-      `UPDATE activities SET status=COALESCE($1,status), notes=COALESCE($2,notes), completed_at=$3 WHERE id=$4 RETURNING *`,
-      [status, notes, completed_at, id]
+      `UPDATE activities SET status=COALESCE($1,status), notes=COALESCE($2,notes),
+        completed_at=CASE WHEN $1='completed' THEN $3 WHEN $1='pending' THEN NULL ELSE completed_at END,
+        skill_tags=COALESCE($4,skill_tags), mastery_score=COALESCE($5,mastery_score),
+        evidence_url=COALESCE($6,evidence_url), assessment_type=COALESCE($7,assessment_type),
+        pass_criteria=COALESCE($8,pass_criteria), why_this_task=COALESCE($9,why_this_task),
+        next_review_at=COALESCE($10,next_review_at), role_track=COALESCE($11,role_track)
+       WHERE id=$12 RETURNING *`,
+      [status, notes, completed_at, skill_tags, mastery_score, evidence_url, assessment_type, pass_criteria, why_this_task, next_review_at, role_track, id]
     );
+    if (result.rows[0]?.skill_tags) await refreshSkillMastery(result.rows[0].skill_tags);
     res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/skill-mastery', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT sm.*,
+        COUNT(a.id) FILTER (WHERE a.status='completed') as completed_activities,
+        COUNT(a.id) as total_activities
+      FROM skill_mastery sm
+      LEFT JOIN activities a ON a.skill_tags @> ARRAY[sm.skill_id]::TEXT[]
+      GROUP BY sm.skill_id
+      ORDER BY sm.score ASC, sm.next_review_at NULLS LAST, sm.skill_name
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/review-queue', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT a.id, a.name, a.category, a.skill_tags, a.mastery_score, a.last_reviewed_at, a.next_review_at,
+             a.pass_criteria, a.why_this_task, p.name as phase_name, p.color as phase_color
+      FROM activities a
+      JOIN phases p ON p.id=a.phase_id
+      WHERE a.status='completed'
+        AND (a.next_review_at IS NULL OR a.next_review_at <= NOW() + INTERVAL '2 days' OR a.mastery_score < 70)
+      ORDER BY a.next_review_at NULLS FIRST, a.mastery_score ASC, a.completed_at DESC
+      LIMIT 20
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/activities/:id/review', async (req, res) => {
+  try {
+    const { mastery_score, notes, evidence_url } = req.body;
+    const score = Math.max(0, Math.min(100, parseInt(mastery_score || 60, 10)));
+    const nextReview = nextReviewInterval(score);
+    const result = await db.query(
+      `UPDATE activities SET mastery_score=$2, notes=COALESCE($3,notes),
+        evidence_url=COALESCE($4,evidence_url), last_reviewed_at=NOW(), next_review_at=NOW()+($5 || ' days')::INTERVAL
+       WHERE id=$1 RETURNING *`,
+      [req.params.id, score, notes || null, evidence_url || null, nextReview]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    await refreshSkillMastery(result.rows[0].skill_tags || []);
+    res.json({ success: true, activity: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -80,15 +213,23 @@ app.put('/api/activities/:id', async (req, res) => {
 app.post('/api/activities/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, key_takeaways, difficulty_rating, time_spent_minutes } = req.body;
-    const activity = await db.query('SELECT phase_id, name FROM activities WHERE id=$1', [id]);
+    const { content, key_takeaways, difficulty_rating, time_spent_minutes, mastery_score, evidence_url } = req.body;
+    const activity = await db.query('SELECT phase_id, name, skill_tags FROM activities WHERE id=$1', [id]);
     if (!activity.rows.length) return res.status(404).json({ error: 'Not found' });
+    const score = Math.max(0, Math.min(100, parseInt(mastery_score || difficultyToMastery(difficulty_rating || 3), 10)));
+    const nextReview = nextReviewInterval(score);
     await db.query(
       `INSERT INTO activity_reflections (activity_id, phase_id, content, key_takeaways, difficulty_rating, time_spent_minutes)
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [id, activity.rows[0].phase_id, content || 'Completed', key_takeaways || [], difficulty_rating || 3, time_spent_minutes || 0]
     );
-    const result = await db.query(`UPDATE activities SET status='completed', completed_at=NOW() WHERE id=$1 RETURNING *`, [id]);
+    const result = await db.query(
+      `UPDATE activities SET status='completed', completed_at=NOW(),
+        mastery_score=$2, evidence_url=COALESCE($3,evidence_url), last_reviewed_at=NOW(), next_review_at=NOW()+($4 || ' days')::INTERVAL
+       WHERE id=$1 RETURNING *`,
+      [id, score, evidence_url || null, nextReview]
+    );
+    await refreshSkillMastery(activity.rows[0].skill_tags || []);
     res.json({ success: true, activity: result.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -202,6 +343,8 @@ app.get('/api/daily-plan', async (req, res) => {
             activity_id: activity.id, activity_name: activity.name, phase_name: activity.phase_name,
             phase_color: activity.phase_color, category: activity.category, estimated_minutes: activity.estimated_minutes,
             difficulty: activity.difficulty, resource_url: activity.resource_url, resource_name: activity.resource_name,
+            skill_tags: activity.skill_tags || [], assessment_type: activity.assessment_type,
+            pass_criteria: activity.pass_criteria, why_this_task: activity.why_this_task,
             start_time: Math.floor(block.start / 60) + ':' + String(block.start % 60).padStart(2, '0'),
             end_time: Math.floor((block.start + estMinutes) / 60) + ':' + String((block.start + estMinutes) % 60).padStart(2, '0'),
             duration: estMinutes
@@ -334,9 +477,17 @@ app.get('/api/schedule/deleted', async (req, res) => {
 app.post('/api/time-logs', async (req, res) => {
   try {
     const { activity_id, phase_id, duration_minutes, notes, source } = req.body;
+    let resolvedPhaseId = phase_id;
+
+    if (!resolvedPhaseId && activity_id) {
+      const activity = await db.query('SELECT phase_id FROM activities WHERE id=$1', [activity_id]);
+      if (!activity.rows.length) return res.status(404).json({ error: 'Activity not found' });
+      resolvedPhaseId = activity.rows[0].phase_id;
+    }
+
     const result = await db.query(
       `INSERT INTO time_logs (activity_id,phase_id,duration_minutes,notes,source) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [activity_id, phase_id, duration_minutes, notes, source || 'manual']
+      [activity_id, resolvedPhaseId, duration_minutes, notes, source || 'manual']
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -345,7 +496,7 @@ app.post('/api/time-logs', async (req, res) => {
 app.get('/api/time-logs', async (req, res) => {
   try {
     const { date, phase_id, activity_id } = req.query;
-    let query = `SELECT tl.*, p.name as phase_name, p.color as phase_color FROM time_logs tl JOIN phases p ON tl.phase_id=p.id`;
+    let query = `SELECT tl.*, p.name as phase_name, p.color as phase_color FROM time_logs tl LEFT JOIN phases p ON tl.phase_id=p.id`;
     const params = []; const conditions = [];
     if (date) { conditions.push(`DATE(tl.logged_at)=$${params.length + 1}`); params.push(date); }
     if (phase_id) { conditions.push(`tl.phase_id=$${params.length + 1}`); params.push(phase_id); }
@@ -376,8 +527,11 @@ app.get('/api/projects', async (req, res) => {
 app.put('/api/projects/:id', async (req, res) => {
   try {
     const result = await db.query(
-      `UPDATE projects SET is_completed=COALESCE($1,is_completed), notes=COALESCE($2,notes), updated_at=NOW() WHERE id=$3 RETURNING *`,
-      [req.body.is_completed, req.body.notes, req.params.id]
+      `UPDATE projects SET is_completed=COALESCE($1,is_completed), notes=COALESCE($2,notes),
+        evidence_url=COALESCE($3,evidence_url), validation_notes=COALESCE($4,validation_notes),
+        result_summary=COALESCE($5,result_summary), interview_story=COALESCE($6,interview_story),
+        updated_at=NOW() WHERE id=$7 RETURNING *`,
+      [req.body.is_completed, req.body.notes, req.body.evidence_url, req.body.validation_notes, req.body.result_summary, req.body.interview_story, req.params.id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -465,32 +619,59 @@ app.delete('/api/journal/:id', async (req, res) => {
 // ============================================
 app.get('/api/dashboard', async (req, res) => {
   try {
+    const weeklyTargetHours = parseFloat(process.env.WEEKLY_TARGET_HOURS || '10');
     const todayResult = await db.query(`SELECT COALESCE(SUM(duration_minutes),0) as total FROM time_logs WHERE DATE(logged_at)=CURRENT_DATE`);
     const todaySchedule = await db.query(`SELECT * FROM schedule WHERE DATE(start_time)=CURRENT_DATE AND deleted_at IS NULL ORDER BY start_time`);
     const upcoming = await db.query(`SELECT * FROM schedule WHERE start_time>=CURRENT_DATE AND start_time<CURRENT_DATE+INTERVAL '7 days' AND deleted_at IS NULL ORDER BY start_time LIMIT 20`);
-    const phaseProgress = await db.query(`SELECT p.id,p.name,p.weight,p.color,COUNT(a.id) FILTER (WHERE a.status='completed') as done,COUNT(a.id) as total FROM phases p LEFT JOIN activities a ON p.id=a.phase_id GROUP BY p.id,p.name,p.weight,p.color,p.display_order ORDER BY p.display_order`);
+    const phaseProgress = await db.query(`SELECT p.id,p.name,p.weight,p.color,COUNT(a.id) FILTER (WHERE a.status='completed') as completed_activities,COUNT(a.id) as total_activities FROM phases p LEFT JOIN activities a ON p.id=a.phase_id GROUP BY p.id,p.name,p.weight,p.color,p.display_order ORDER BY p.display_order`);
     const weeklyTotals = await db.query(`SELECT DATE(logged_at) as date,SUM(duration_minutes) as minutes FROM time_logs WHERE logged_at>=CURRENT_DATE-INTERVAL '7 days' GROUP BY DATE(logged_at) ORDER BY date`);
     const weekTotal = await db.query(`SELECT COALESCE(SUM(duration_minutes),0) as total FROM time_logs WHERE logged_at>=DATE_TRUNC('week',CURRENT_DATE)`);
+    const nextTask = await db.query(`
+      SELECT a.id, a.name, a.category, a.estimated_minutes, a.difficulty, a.skill_tags, a.assessment_type, a.pass_criteria, a.why_this_task,
+             p.name as phase_name, p.color as phase_color
+      FROM activities a JOIN phases p ON a.phase_id=p.id
+      WHERE a.status='pending' AND NOT EXISTS (
+        SELECT 1 FROM activity_prerequisites ap JOIN activities pa ON pa.id=ap.prerequisite_id
+        WHERE ap.activity_id=a.id AND pa.status != 'completed'
+      )
+      ORDER BY p.display_order, a.display_order, a.difficulty
+      LIMIT 1
+    `);
+    const reviewDebt = await db.query(`
+      SELECT COUNT(*) as due_count
+      FROM activities
+      WHERE status='completed'
+        AND (next_review_at IS NULL OR next_review_at <= NOW() OR mastery_score < 70)
+    `);
+    const weakestSkills = await db.query(`SELECT * FROM skill_mastery ORDER BY score ASC, confidence ASC, skill_name LIMIT 4`);
+    const artifacts = await db.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE evidence_url IS NOT NULL) as evidence_count,
+        COUNT(*) FILTER (WHERE assessment_type='project' AND evidence_url IS NOT NULL) as project_artifact_count
+      FROM activities
+    `);
+    const weekMinutes = parseInt(weekTotal.rows[0].total);
+    const weekHours = weekMinutes / 60;
     res.json({
       today_minutes: parseInt(todayResult.rows[0].total), today_hours: (parseInt(todayResult.rows[0].total) / 60).toFixed(1),
       today_schedule: todaySchedule.rows, upcoming: upcoming.rows, streak: 0,
       phase_progress: phaseProgress.rows, weekly_totals: weeklyTotals.rows,
-      week_total_minutes: parseInt(weekTotal.rows[0].total), week_total_hours: (parseInt(weekTotal.rows[0].total) / 60).toFixed(1)
+      week_total_minutes: weekMinutes, week_total_hours: weekHours.toFixed(1),
+      weekly_target_hours: weeklyTargetHours,
+      weekly_execution_ratio: weeklyTargetHours > 0 ? Math.round((weekHours / weeklyTargetHours) * 100) : 0,
+      weekly_gap_hours: Math.max(0, weeklyTargetHours - weekHours).toFixed(1),
+      next_task: nextTask.rows[0] || null,
+      review_debt: parseInt(reviewDebt.rows[0].due_count),
+      weakest_skills: weakestSkills.rows,
+      evidence_count: parseInt(artifacts.rows[0].evidence_count),
+      project_artifact_count: parseInt(artifacts.rows[0].project_artifact_count)
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ============================================
-// REOPEN / UNDO / RECENTLY-COMPLETED
+// RECENTLY-COMPLETED
 // ============================================
-app.post('/api/activities/:id/reopen', async (req, res) => {
-  try {
-    const result = await db.query(`UPDATE activities SET status='pending', completed_at=NULL WHERE id=$1 RETURNING *`, [req.params.id]);
-    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json({ success: true, activity: result.rows[0] });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.get('/api/recently-completed', async (req, res) => {
   try {
     const [acts, projs, booksList] = await Promise.all([
@@ -535,20 +716,30 @@ app.get('/api/streaks', async (req, res) => {
 // ============================================
 // SEED / MIGRATE / HEALTH
 // ============================================
-app.post('/api/seed', async (req, res) => {
+app.post('/api/seed', requireAdminToken, async (req, res) => {
   try {
     const fs = require('fs'), path = require('path');
     await db.query(fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8'));
     await db.query(fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8'));
+    await db.query(fs.readFileSync(path.join(__dirname, 'migration-v2.sql'), 'utf8'));
+    await db.query(fs.readFileSync(path.join(__dirname, 'migration-v3.sql'), 'utf8'));
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/migrate-v2', async (req, res) => {
+app.post('/api/migrate-v2', requireAdminToken, async (req, res) => {
   try {
     const fs = require('fs'), path = require('path');
     await db.query(fs.readFileSync(path.join(__dirname, 'migration-v2.sql'), 'utf8'));
     res.json({ success: true, message: 'Migration v2 applied' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/migrate-v3', requireAdminToken, async (req, res) => {
+  try {
+    const fs = require('fs'), path = require('path');
+    await db.query(fs.readFileSync(path.join(__dirname, 'migration-v3.sql'), 'utf8'));
+    res.json({ success: true, message: 'Migration v3 applied' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -27,6 +27,15 @@ CREATE TABLE IF NOT EXISTS activities (
   resource_url TEXT,
   resource_name TEXT,
   notes TEXT,
+  skill_tags TEXT[] DEFAULT '{}',
+  mastery_score INTEGER DEFAULT 0 CHECK (mastery_score BETWEEN 0 AND 100),
+  last_reviewed_at TIMESTAMPTZ,
+  next_review_at TIMESTAMPTZ,
+  evidence_url TEXT,
+  assessment_type TEXT DEFAULT 'task',
+  pass_criteria TEXT,
+  why_this_task TEXT,
+  role_track TEXT DEFAULT 'core',
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -68,6 +77,10 @@ CREATE TABLE IF NOT EXISTS projects (
   phase_id UUID REFERENCES phases(id),
   is_completed BOOLEAN DEFAULT false,
   notes TEXT,
+  evidence_url TEXT,
+  validation_notes TEXT,
+  result_summary TEXT,
+  interview_story TEXT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -115,6 +128,19 @@ CREATE TABLE IF NOT EXISTS weekly_reports (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 10. Skill Mastery (capability tracking)
+CREATE TABLE IF NOT EXISTS skill_mastery (
+  skill_id TEXT PRIMARY KEY,
+  skill_name TEXT NOT NULL,
+  score INTEGER DEFAULT 0 CHECK (score BETWEEN 0 AND 100),
+  evidence_count INTEGER DEFAULT 0,
+  last_assessed_at TIMESTAMPTZ,
+  next_review_at TIMESTAMPTZ,
+  confidence INTEGER DEFAULT 0 CHECK (confidence BETWEEN 0 AND 100),
+  notes TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_activities_phase ON activities(phase_id);
 CREATE INDEX IF NOT EXISTS idx_schedule_start ON schedule(start_time);
@@ -124,3 +150,6 @@ CREATE INDEX IF NOT EXISTS idx_time_logs_phase ON time_logs(phase_id);
 CREATE INDEX IF NOT EXISTS idx_journal_created ON journal_entries(created_at);
 CREATE INDEX IF NOT EXISTS idx_books_phase ON books(phase_id);
 CREATE INDEX IF NOT EXISTS idx_projects_phase ON projects(phase_id);
+CREATE INDEX IF NOT EXISTS idx_activities_next_review ON activities(next_review_at);
+CREATE INDEX IF NOT EXISTS idx_activities_skill_tags ON activities USING GIN(skill_tags);
+CREATE INDEX IF NOT EXISTS idx_skill_mastery_next_review ON skill_mastery(next_review_at);
