@@ -12,10 +12,11 @@
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 :root {
-  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
-  --text: #e2e8f0; --text2: #94a3b8; --accent: #4f46e5;
-  --green: #22c55e; --red: #ef4444; --orange: #f59e0b;
-  --blue: #3b82f6; --purple: #8b5cf6; --pink: #ec4899;
+  --bg: #101318; --bg2: #181d24; --bg3: #28313b;
+  --text: #edf2f7; --text2: #9aa7b5; --accent: #2f80ed;
+  --green: #24a148; --red: #da1e28; --orange: #f1c21b;
+  --blue: #3b82f6; --purple: #7c3aed; --pink: #d946ef;
+  --teal: #10b981; --line: #303946;
 }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px; }
 .container { max-width: 800px; margin: 0 auto; padding: 16px; }
@@ -28,18 +29,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .subtitle { color: var(--text2); font-size: 0.85rem; }
 
 /* Tabs */
-.tabs { display: flex; gap: 4px; background: var(--bg2); padding: 4px; border-radius: 12px; margin-bottom: 20px; overflow-x: auto; }
+.tabs { display: flex; gap: 4px; background: var(--bg2); padding: 4px; border-radius: 8px; margin-bottom: 20px; overflow-x: auto; border: 1px solid var(--line); }
 .tab { flex: 1; min-width: fit-content; padding: 8px 14px; border: none; background: transparent; color: var(--text2); font-size: 0.8rem; font-weight: 600; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
 .tab.active { background: var(--accent); color: white; }
 .tab:hover:not(.active) { background: var(--bg3); color: var(--text); }
 
 /* Cards */
-.card { background: var(--bg2); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.card { background: var(--bg2); border-radius: 8px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--line); }
 .card-title { font-size: 0.85rem; color: var(--text2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* Stats grid */
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
-.stat-card { background: var(--bg2); border-radius: 10px; padding: 14px; text-align: center; }
+.stat-card { background: var(--bg2); border-radius: 8px; padding: 14px; text-align: center; border: 1px solid var(--line); }
 .stat-value { font-size: 1.6rem; font-weight: 700; }
 .stat-label { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
 
@@ -129,6 +130,16 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
 /* Timer */
 .timer-display { font-size: 2.5rem; font-weight: 700; text-align: center; padding: 20px 0; font-variant-numeric: tabular-nums; }
 .timer-controls { display: flex; gap: 10px; justify-content: center; }
+.focus-panel { border-left: 4px solid var(--accent); }
+.focus-title { font-size: 1.15rem; font-weight: 750; margin-bottom: 6px; }
+.focus-meta { display: flex; gap: 8px; flex-wrap: wrap; color: var(--text2); font-size: 0.78rem; margin-bottom: 10px; }
+.pill { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; color: var(--text2); font-size: 0.72rem; }
+.metric-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.metric-tile { background: #141a21; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.metric-tile strong { display: block; font-size: 1.1rem; }
+.section-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.list-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.list-row:last-child { border-bottom: none; }
 
 @media (max-width: 600px) {
   .container { padding: 10px; }
@@ -162,19 +173,40 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
 
   <!-- Tabs -->
   <div class="tabs" id="tabs">
-    <button class="tab active" data-tab="dashboard">Dashboard</button>
-    <button class="tab" data-tab="schedule">Schedule</button>
-    <button class="tab" data-tab="plate">Today's Plate</button>
-    <button class="tab" data-tab="timer">Timer</button>
-    <button class="tab" data-tab="phases">Phases</button>
-    <button class="tab" data-tab="projects">Projects</button>
-    <button class="tab" data-tab="books">Books</button>
-    <button class="tab" data-tab="journal">Journal</button>
-    <button class="tab" data-tab="report">Report</button>
+    <button class="tab active" data-tab="dashboard">Home</button>
+    <button class="tab" data-tab="plate">Today</button>
+    <button class="tab" data-tab="schedule">Calendar</button>
+    <button class="tab" data-tab="phases">Roadmap</button>
+    <button class="tab" data-tab="journal">Review</button>
+    <button class="tab" data-tab="report">Analytics</button>
   </div>
 
   <!-- ============ TAB: DASHBOARD ============ -->
   <div id="tab-dashboard" class="tab-content">
+    <div class="card focus-panel">
+      <div class="card-title">Next Best Task</div>
+      <div id="homeNextTask"><div class="empty">Loading next task...</div></div>
+    </div>
+
+    <div class="metric-strip">
+      <div class="metric-tile"><strong id="homeWeeklyTarget">0 / 10h</strong><span class="stat-label">Weekly execution</span></div>
+      <div class="metric-tile"><strong id="homeWeeklyGap">0h</strong><span class="stat-label">Gap to target</span></div>
+      <div class="metric-tile"><strong id="homeReviewDebt">0</strong><span class="stat-label">Reviews due</span></div>
+      <div class="metric-tile"><strong id="homeArtifacts">0</strong><span class="stat-label">Evidence artifacts</span></div>
+    </div>
+    <div class="card" id="homePlanAdvice"></div>
+
+    <div class="section-grid">
+      <div class="card">
+        <div class="card-title">Skill Risk</div>
+        <div id="homeSkillRisk"><div class="empty">No skill data yet</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Today Blocks</div>
+        <div id="todaySchedule"><div class="empty">No sessions today</div></div>
+      </div>
+    </div>
+
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-value" id="dashToday">0</div><div class="stat-label">Today (min)</div></div>
       <div class="stat-card"><div class="stat-value" id="dashWeek">0</div><div class="stat-label">This Week (hrs)</div></div>
@@ -185,11 +217,6 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
     <div class="card">
       <div class="card-title">🕐 Recently Completed (last 7 days) — <span style="font-size:0.7rem;text-transform:none;letter-spacing:0;">click ↩ to undo</span></div>
       <div id="recentlyCompleted"><div class="empty">No completions yet</div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Today's Schedule</div>
-      <div id="todaySchedule"><div class="empty">No sessions today</div></div>
     </div>
 
     <div class="card">
@@ -227,8 +254,39 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
         <button class="btn btn-outline" onclick="stopAndLogTaskTimer()" id="taskStopBtn" disabled>Stop & Log</button>
       </div>
     </div>
+    <div class="section-grid">
+      <div class="card">
+        <div class="card-title">Focus Timer</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <select id="timerPhase" style="flex:1;">
+            <option value="">Select phase...</option>
+          </select>
+          <select id="timerMode" style="flex:1;">
+            <option value="focus">Focus (25 min)</option>
+            <option value="short">Short Break (5 min)</option>
+            <option value="long">Long Break (15 min)</option>
+          </select>
+        </div>
+        <div class="timer-display" id="timerDisplay">25:00</div>
+        <div class="timer-controls">
+          <button class="btn btn-primary" onclick="toggleTimer()" id="timerBtn">Start</button>
+          <button class="btn btn-outline" onclick="resetTimer()">Reset</button>
+        </div>
+        <div style="margin-top:12px;font-size:0.8rem;color:var(--text2);text-align:center;" id="timerStatus">Ready</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Quick Log Time</div>
+        <select id="logPhase" style="margin-bottom:6px;"><option value="">Select phase...</option></select>
+        <div style="display:flex;gap:8px;">
+          <input type="number" id="logMinutes" placeholder="Minutes" style="flex:1;" min="1">
+          <button class="btn btn-primary" onclick="logTime()">Log</button>
+        </div>
+        <div style="margin-top:12px;" id="recentLogs"></div>
+      </div>
+    </div>
     <div class="card">
-      <div class="card-title">Today's Auto-Scheduled Plate</div>
+      <div class="card-title">Today's Focus</div>
       <div id="todaysPlateList"><div class="empty">Loading today's quests...</div></div>
     </div>
     <div class="card">
@@ -248,41 +306,12 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
     <div id="scheduleList"></div>
   </div>
 
-  <!-- ============ TAB: TIMER ============ -->
-  <div id="tab-timer" class="tab-content hidden">
-    <div class="card">
-      <div class="card-title">Focus Timer</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <select id="timerPhase" style="flex:1;">
-          <option value="">Select phase...</option>
-        </select>
-        <select id="timerMode" style="flex:1;">
-          <option value="focus">Focus (25 min)</option>
-          <option value="short">Short Break (5 min)</option>
-          <option value="long">Long Break (15 min)</option>
-        </select>
-      </div>
-      <div class="timer-display" id="timerDisplay">25:00</div>
-      <div class="timer-controls">
-        <button class="btn btn-primary" onclick="toggleTimer()" id="timerBtn">Start</button>
-        <button class="btn btn-outline" onclick="resetTimer()">Reset</button>
-      </div>
-      <div style="margin-top:12px;font-size:0.8rem;color:var(--text2);text-align:center;" id="timerStatus">Ready</div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Quick Log Time</div>
-      <select id="logPhase" style="margin-bottom:6px;"><option value="">Select phase...</option></select>
-      <div style="display:flex;gap:8px;">
-        <input type="number" id="logMinutes" placeholder="Minutes" style="flex:1;" min="1">
-        <button class="btn btn-primary" onclick="logTime()">Log</button>
-      </div>
-      <div style="margin-top:12px;" id="recentLogs"></div>
-    </div>
-  </div>
-
   <!-- ============ TAB: PHASES ============ -->
   <div id="tab-phases" class="tab-content hidden">
+    <div class="card">
+      <div class="card-title">Target Track Roadmap</div>
+      <div id="trackRoadmap"></div>
+    </div>
     <div class="card">
       <div class="card-title">All Phases</div>
       <div id="allPhasesList"></div>
@@ -292,20 +321,12 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
       <select id="activityPhaseFilter" onchange="loadActivities()"><option value="">All phases</option></select>
       <div id="activitiesList" style="margin-top:8px;"></div>
     </div>
-  </div>
-
-  <!-- ============ TAB: PROJECTS ============ -->
-  <div id="tab-projects" class="tab-content hidden">
     <div class="card">
-      <div class="card-title">Projects & Challenges</div>
+      <div class="card-title">Portfolio Artifacts</div>
       <div id="projectsList"></div>
     </div>
-  </div>
-
-  <!-- ============ TAB: BOOKS ============ -->
-  <div id="tab-books" class="tab-content hidden">
     <div class="card">
-      <div class="card-title">Reading Tracker</div>
+      <div class="card-title">Reading</div>
       <select id="bookPhaseFilter" onchange="loadBooks()"><option value="">All phases</option></select>
       <div id="booksList" style="margin-top:8px;"></div>
     </div>
@@ -313,8 +334,18 @@ textarea { background: var(--bg3); border: 1px solid transparent; color: var(--t
 
   <!-- ============ TAB: JOURNAL ============ -->
   <div id="tab-journal" class="tab-content hidden">
+    <div class="section-grid">
+      <div class="card">
+        <div class="card-title">Review Queue</div>
+        <div id="reviewQueue"><div class="empty">Loading review queue...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Skill Mastery</div>
+        <div id="skillMasteryList"><div class="empty">Loading skill mastery...</div></div>
+      </div>
+    </div>
     <div class="card">
-      <div class="card-title">Write Entry</div>
+      <div class="card-title">Write Recall Note</div>
       <select id="journalPhase"><option value="">General</option></select>
       <textarea id="journalContent" placeholder="What did you learn or try today?" style="margin-top:6px;"></textarea>
       <div style="display:flex;gap:8px;margin-top:6px;">
@@ -411,7 +442,8 @@ if ('serviceWorker' in navigator) {
 
 // ============ API HELPERS ============
 async function api(path, options = {}) {
-  const url = API_BASE + '/api' + path;
+  const normalizedPath = path.startsWith('/api/') ? path.slice(4) : path;
+  const url = API_BASE + '/api' + normalizedPath;
   const config = {
     headers: { 'Content-Type': 'application/json' },
     ...options
@@ -440,13 +472,10 @@ document.querySelectorAll('.tab').forEach(tab => {
 function loadTabData(tab) {
   switch(tab) {
     case 'dashboard': loadDashboard(); break;
-    case 'plate': loadTodaysPlate(); break;
+    case 'plate': loadTodaysPlate(); loadTimerData(); break;
     case 'schedule': loadSchedule(); break;
-    case 'timer': loadTimerData(); break;
-    case 'phases': loadPhasesTab(); break;
-    case 'projects': loadProjects(); break;
-    case 'books': loadBooks(); break;
-    case 'journal': loadJournal(); break;
+    case 'phases': loadPhasesTab(); loadProjects(); loadBooks(); break;
+    case 'journal': loadReview(); loadJournal(); break;
     case 'report': loadReport(); break;
   }
 }
@@ -460,6 +489,13 @@ async function loadDashboard() {
   document.getElementById('dashToday').textContent = data.today_minutes || 0;
   document.getElementById('dashWeek').textContent = data.week_total_hours || '0';
   document.getElementById('dashStreak').textContent = data.streak || 0;
+  document.getElementById('homeWeeklyTarget').textContent = `${data.week_total_hours || '0'} / ${data.weekly_target_hours || 10}h`;
+  document.getElementById('homeWeeklyGap').textContent = `${data.weekly_gap_hours || '0'}h`;
+  document.getElementById('homeReviewDebt').textContent = data.review_debt || 0;
+  document.getElementById('homeArtifacts').textContent = data.evidence_count || 0;
+  renderWeeklyPlanAdvice(data);
+  renderHomeNextTask(data.next_task);
+  renderHomeSkillRisk(data.weakest_skills || []);
 
   // Overall progress
   let totalWeight = 0, completedWeight = 0;
@@ -519,6 +555,59 @@ async function loadDashboard() {
 
   // Weekly chart
   renderWeeklyChart(data.weekly_totals);
+}
+
+function renderWeeklyPlanAdvice(data) {
+  const el = document.getElementById('homePlanAdvice');
+  const ratio = data.weekly_execution_ratio || 0;
+  const gap = data.weekly_gap_hours || '0';
+  if (ratio < 50) {
+    el.innerHTML = `<div class="card-title">Anti-Overload Mode</div><div style="font-size:0.9rem;">You are below half of the ${data.weekly_target_hours || 10}h weekly target. Keep this week tight: one heavy task, one problem session, one review block. Gap: ${gap}h.</div>`;
+  } else if (ratio < 90) {
+    el.innerHTML = `<div class="card-title">Weekly Planning</div><div style="font-size:0.9rem;">You are close but not done. Prioritize today's next task and clear ${data.review_debt || 0} due reviews before adding new scope. Gap: ${gap}h.</div>`;
+  } else {
+    el.innerHTML = `<div class="card-title">Weekly Planning</div><div style="font-size:0.9rem;">On pace this week. Use extra time for evidence links, review debt, or one portfolio artifact polish pass.</div>`;
+  }
+}
+
+function renderHomeNextTask(task) {
+  const el = document.getElementById('homeNextTask');
+  if (!task) {
+    el.innerHTML = '<div class="empty">No unlocked task. Review completed work or adjust prerequisites.</div>';
+    return;
+  }
+  const tags = (task.skill_tags || []).map(t => `<span class="pill">${safeAttr(t)}</span>`).join('');
+  el.innerHTML = `
+    <div class="focus-title">${safeAttr(task.name)}</div>
+    <div class="focus-meta">
+      <span>${safeAttr(task.phase_name || 'Roadmap')}</span>
+      <span>${safeAttr(task.category || 'task')}</span>
+      <span>${task.estimated_minutes || 45} min</span>
+      <span>${safeAttr(task.assessment_type || 'task')}</span>
+    </div>
+    <div style="font-size:0.85rem;color:var(--text2);margin-bottom:10px;">Why: ${safeAttr(task.why_this_task || 'This is the next dependency in your quant roadmap.')}</div>
+    <div style="font-size:0.8rem;margin-bottom:10px;">Pass criteria: ${safeAttr(task.pass_criteria || 'Complete with recall notes.')}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">${tags}</div>
+    <button class="btn btn-primary btn-sm" onclick="document.querySelector('[data-tab=&quot;plate&quot;]').click()">Start in Today</button>
+  `;
+}
+
+function renderHomeSkillRisk(skills) {
+  const el = document.getElementById('homeSkillRisk');
+  if (!skills.length) {
+    el.innerHTML = '<div class="empty">Complete activities with recall to build skill data.</div>';
+    return;
+  }
+  el.innerHTML = skills.map(s => `
+    <div class="list-row">
+      <div style="flex:1;">
+        <div style="font-weight:650;">${safeAttr(s.skill_name)}</div>
+        <div style="font-size:0.75rem;color:var(--text2);">${s.evidence_count || 0} evidence links · confidence ${s.confidence || 0}%</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${Math.max(0, Math.min(100, s.score || 0))}%;background:${(s.score || 0) < 60 ? 'var(--red)' : 'var(--teal)'}"></div></div>
+      </div>
+      <strong>${s.score || 0}</strong>
+    </div>
+  `).join('');
 }
 
 let weeklyChartInstance = null;
@@ -793,6 +882,7 @@ async function loadRecentLogs() {
 
 // ============ PHASES TAB ============
 async function loadPhasesTab() {
+  renderTrackRoadmap();
   const el = document.getElementById('allPhasesList');
   const filterSel = document.getElementById('activityPhaseFilter');
   filterSel.innerHTML = '<option value="">All phases</option>';
@@ -802,17 +892,41 @@ async function loadPhasesTab() {
   if (!phases) return;
   
   phases.forEach(p => {
-    filterSel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+    filterSel.innerHTML += `<option value="${safeAttr(p.id)}">${safeAttr(p.name)}</option>`;
     html += `<div class="phase-item" style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bg3);">
       <div class="phase-header">
-        <span class="phase-name" style="color:${p.color}">${p.name}</span>
+        <span class="phase-name" style="color:${safeAttr(p.color)}">${safeAttr(p.name)}</span>
         <span class="phase-pct">${p.duration_weeks ? p.duration_weeks + ' wk' : 'Ongoing'} · ${p.hours_per_week || '—'} hr/wk</span>
       </div>
-      <div style="font-size:0.8rem;color:var(--text2);margin:4px 0;">${p.description || ''}</div>
+      <div style="font-size:0.8rem;color:var(--text2);margin:4px 0;">${safeAttr(p.description || '')}</div>
     </div>`;
   });
   el.innerHTML = html;
   loadActivities();
+}
+
+function renderTrackRoadmap() {
+  const el = document.getElementById('trackRoadmap');
+  const phases = [
+    ['0. Market vocabulary', '1 week', 'Explain equity, futures, options, bonds, ETFs, beta, Sharpe', 'core'],
+    ['1. Probability interview base', '4 weeks', '100 EV/Bayes/combinatorics problems with accuracy tracked', 'options_mm'],
+    ['2. Statistics for returns', '3 weeks', 'Tests, confidence intervals, bootstrapping, drawdowns', 'awm_quant'],
+    ['3. Market data engineering', '3 weeks', 'Clean OHLCV/corporate-action-adjusted dataset', 'quant_dev'],
+    ['4. Backtesting and portfolio metrics', '4 weeks', 'Backtester with costs, slippage, Sharpe, max drawdown', 'awm_quant'],
+    ['5. Portfolio/factor research', '4 weeks', 'Replicate one factor strategy with write-up', 'awm_quant'],
+    ['6. Options and hedging', '5 weeks', 'Black-Scholes, Greeks, delta hedge simulator', 'options_mm'],
+    ['7. Trading systems', '5 weeks', 'Limit-order-book simulator or matching engine', 'quant_dev'],
+    ['8. Interview sprint', 'ongoing', 'Probability, coding, SQL, systems, market questions', 'core']
+  ];
+  el.innerHTML = phases.map(([name, duration, output, track]) => `
+    <div class="list-row">
+      <div style="flex:1;">
+        <div style="font-weight:650;">${safeAttr(name)}</div>
+        <div style="font-size:0.78rem;color:var(--text2);">${safeAttr(duration)} · ${safeAttr(output)}</div>
+      </div>
+      <span class="pill">${safeAttr(track)}</span>
+    </div>
+  `).join('');
 }
 
 async function loadActivities() {
@@ -836,32 +950,34 @@ async function loadActivities() {
 
   el.innerHTML = Object.entries(groups).map(([cat, items]) => `
     <div style="margin-bottom:12px;">
-      <div style="font-weight:600;font-size:0.8rem;color:var(--accent);text-transform:uppercase;margin-bottom:4px;">${cat}</div>
+      <div style="font-weight:600;font-size:0.8rem;color:var(--accent);text-transform:uppercase;margin-bottom:4px;">${safeAttr(cat)}</div>
       ${items.map(a => {
         const pct = a.estimated_minutes ? Math.min(100, Math.round(60 / a.estimated_minutes * 100)) : 0;
+        const activityName = safeAttr(a.name);
         return `<div class="check-item">
-          <div class="check-box ${a.status === 'completed' ? 'checked' : ''}" onclick="toggleActivity('${a.id}')"></div>
+          <div class="check-box ${a.status === 'completed' ? 'checked' : ''}" data-activity-id="${safeAttr(a.id)}" data-activity-name="${activityName}" data-status="${safeAttr(a.status)}" onclick="toggleActivityFromBtn(this)"></div>
           <div style="flex:1;">
-            <div class="check-label ${a.status === 'completed' ? 'done' : ''}">${a.name}</div>
+            <div class="check-label ${a.status === 'completed' ? 'done' : ''}">${activityName}</div>
             <div style="display:flex;gap:6px;margin-top:2px;flex-wrap:wrap;">
               ${a.resource_url ? `<a href="${a.resource_url}" target="_blank" style="font-size:0.7rem;color:var(--blue);">🔗 ${a.resource_name || 'Link'}</a>` : ''}
               ${a.estimated_minutes ? `<span style="font-size:0.7rem;color:var(--text2);">⏱ ${a.estimated_minutes} min</span>` : ''}
             </div>
           </div>
-          <span class="check-category">${a.sub_category || ''}</span>
+          <span class="check-category">${safeAttr(a.sub_category || '')}</span>
         </div>`;
       }).join('')}
     </div>
   `).join('');
 }
 
-async function toggleActivity(id) {
-  const data = await api('/activities/' + id, {
-    method: 'PUT',
-    body: JSON.stringify({ status: 'completed' })
-  });
-  loadActivities();
-  loadDashboard();
+async function toggleActivityFromBtn(btn) {
+  const { activityId, activityName, status } = btn.dataset;
+  if (status === 'completed') {
+    await confirmUndo('activity', activityId, activityName);
+    loadActivities();
+    return;
+  }
+  openReflectionModal(activityId, activityName);
 }
 
 // ============ PROJECTS ============
@@ -881,19 +997,49 @@ async function loadProjects() {
     <div style="margin-bottom:12px;">
       <div style="font-weight:600;font-size:0.8rem;color:var(--accent);text-transform:uppercase;margin-bottom:4px;">${cat}</div>
       ${items.map(p => `<div class="check-item">
-        <div class="check-box ${p.is_completed ? 'checked' : ''}" onclick="toggleProject('${p.id}')"></div>
-        <div class="check-label ${p.is_completed ? 'done' : ''}">${p.name}</div>
-        ${p.notes ? `<span style="font-size:0.75rem;color:var(--text2);">${p.notes}</span>` : ''}
+        <div class="check-box ${p.is_completed ? 'checked' : ''}" data-id="${safeAttr(p.id)}" data-name="${safeAttr(p.name)}" data-done="${p.is_completed ? 'true' : 'false'}" onclick="toggleProjectFromBtn(this)"></div>
+        <div style="flex:1;">
+          <div class="check-label ${p.is_completed ? 'done' : ''}">${safeAttr(p.name)}</div>
+          ${p.evidence_url ? `<a href="${safeAttr(p.evidence_url)}" target="_blank" style="font-size:0.75rem;color:var(--blue);">Evidence</a>` : ''}
+          ${p.notes ? `<div style="font-size:0.75rem;color:var(--text2);">${safeAttr(p.notes)}</div>` : ''}
+        </div>
       </div>`).join('')}
     </div>
   `).join('');
 }
 
-async function toggleProject(id) {
-  const data = await api('/projects/' + id, {
+function toggleProjectFromBtn(btn) {
+  if (btn.dataset.done === 'true') {
+    confirmUndo('project', btn.dataset.id, btn.dataset.name).then(loadProjects);
+    return;
+  }
+  showModal('Complete Portfolio Artifact', `
+    <div style="font-weight:650;margin-bottom:10px;">${safeAttr(btn.dataset.name)}</div>
+    <input id="projectEvidenceUrl" placeholder="Evidence URL (GitHub, notebook, report)" />
+    <textarea id="projectValidation" placeholder="Validation: tests, leakage checks, assumptions"></textarea>
+    <textarea id="projectResult" placeholder="Result: Sharpe, drawdown, accuracy, finding"></textarea>
+    <textarea id="projectStory" placeholder="Interview story: what you built, tradeoffs, bugs, next steps"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="completeProjectArtifact('${safeAttr(btn.dataset.id)}')">Save Artifact</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+async function completeProjectArtifact(id) {
+  const evidenceUrl = document.getElementById('projectEvidenceUrl').value.trim();
+  if (!evidenceUrl) return alert('Add an evidence URL before completing a project artifact.');
+  await api('/projects/' + id, {
     method: 'PUT',
-    body: JSON.stringify({ is_completed: true })
+    body: JSON.stringify({
+      is_completed: true,
+      evidence_url: evidenceUrl,
+      validation_notes: document.getElementById('projectValidation').value.trim() || null,
+      result_summary: document.getElementById('projectResult').value.trim() || null,
+      interview_story: document.getElementById('projectStory').value.trim() || null
+    })
   });
+  closeModal();
   loadProjects();
   loadDashboard();
 }
@@ -962,6 +1108,83 @@ async function loadJournal() {
   const sel = document.getElementById('journalPhase');
   sel.innerHTML = '<option value="">General</option>';
   state.phases.forEach(p => { sel.innerHTML += `<option value="${p.id}">${p.name}</option>`; });
+}
+
+async function loadReview() {
+  const [queue, skills] = await Promise.all([
+    api('/review-queue'),
+    api('/skill-mastery')
+  ]);
+  renderReviewQueue(queue || []);
+  renderSkillMastery(skills || []);
+}
+
+function renderReviewQueue(items) {
+  const el = document.getElementById('reviewQueue');
+  if (!items.length) {
+    el.innerHTML = '<div class="empty">No reviews due. Keep creating evidence.</div>';
+    return;
+  }
+  el.innerHTML = items.map(item => {
+    const tags = (item.skill_tags || []).map(t => `<span class="pill">${safeAttr(t)}</span>`).join('');
+    const due = item.next_review_at ? formatDate(item.next_review_at) : 'unscheduled';
+    return `<div class="list-row">
+      <div style="flex:1;">
+        <div style="font-weight:650;">${safeAttr(item.name)}</div>
+        <div style="font-size:0.75rem;color:var(--text2);">${safeAttr(item.phase_name || '')} · due ${safeAttr(due)} · mastery ${item.mastery_score || 0}</div>
+        <div style="font-size:0.78rem;margin-top:5px;color:var(--text2);">${safeAttr(item.pass_criteria || 'Recall and rescore this item.')}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">${tags}</div>
+      </div>
+      <button class="btn btn-sm btn-outline" data-id="${safeAttr(item.id)}" data-title="${safeAttr(item.name)}" onclick="openReviewModalFromBtn(this)">Review</button>
+    </div>`;
+  }).join('');
+}
+
+function renderSkillMastery(skills) {
+  const el = document.getElementById('skillMasteryList');
+  if (!skills.length) {
+    el.innerHTML = '<div class="empty">No skill mastery rows yet. Run migration v3 and complete a task.</div>';
+    return;
+  }
+  el.innerHTML = skills.map(skill => `
+    <div class="list-row">
+      <div style="flex:1;">
+        <div style="font-weight:650;">${safeAttr(skill.skill_name)}</div>
+        <div style="font-size:0.75rem;color:var(--text2);">${skill.completed_activities || 0}/${skill.total_activities || 0} activities · ${skill.evidence_count || 0} evidence</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${Math.max(0, Math.min(100, skill.score || 0))}%;background:${(skill.score || 0) < 60 ? 'var(--red)' : 'var(--teal)'}"></div></div>
+      </div>
+      <strong>${skill.score || 0}</strong>
+    </div>
+  `).join('');
+}
+
+function openReviewModalFromBtn(btn) {
+  showModal('Review Skill Evidence', `
+    <div style="font-weight:650;margin-bottom:10px;">${safeAttr(btn.dataset.title)}</div>
+    <input id="reviewMastery" type="number" min="0" max="100" placeholder="Mastery score 0-100" />
+    <input id="reviewEvidenceUrl" placeholder="Evidence URL (GitHub, notebook, write-up)" />
+    <textarea id="reviewNotes" placeholder="What did you recall? What still fails under pressure?"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveActivityReview('${safeAttr(btn.dataset.id)}')">Save Review</button>
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+async function saveActivityReview(activityId) {
+  const mastery = parseInt(document.getElementById('reviewMastery').value);
+  if (Number.isNaN(mastery) || mastery < 0 || mastery > 100) return alert('Enter mastery from 0 to 100.');
+  await api('/activities/' + activityId + '/review', {
+    method: 'POST',
+    body: JSON.stringify({
+      mastery_score: mastery,
+      evidence_url: document.getElementById('reviewEvidenceUrl').value.trim() || null,
+      notes: document.getElementById('reviewNotes').value.trim() || null
+    })
+  });
+  closeModal();
+  loadReview();
+  loadDashboard();
 }
 
 // ============ REPORT ============
@@ -1041,7 +1264,12 @@ function hhmmToDisplay(hhmm) {
 }
 
 function safeAttr(v) {
-  return String(v || '').replace(/&/g, '&').replace(/'/g, '&#39;').replace(/"/g, '"').replace(/</g, '<');
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 async function loadTodaysPlate() {
@@ -1066,6 +1294,7 @@ function renderTodaysPlate(data) {
     const qJson = safeAttr(JSON.stringify(q));
     const phaseName = safeAttr(q.phase_name);
     const actName = safeAttr(q.activity_name);
+    const skillTags = (q.skill_tags || []).map(t => `<span class="pill">${safeAttr(t)}</span>`).join('');
     return `<div class="sched-item" style="align-items:flex-start;flex-wrap:wrap;">
       <div class="sched-color" style="background:${q.phase_color || '#4f46e5'}"></div>
       <div class="sched-time">${hhmmToDisplay(q.start_time)}<br>→ ${hhmmToDisplay(q.end_time)}</div>
@@ -1073,10 +1302,13 @@ function renderTodaysPlate(data) {
         <div class="sched-title">🎯 ${actName}</div>
         <div class="sched-subject">${phaseName} · ${safeAttr(q.category)} · ${minutesLabel(q.estimated_minutes || q.duration)} · ${'★'.repeat(q.difficulty || 1)}</div>
         ${q.resource_url ? `<a href="${q.resource_url}" target="_blank" style="font-size:0.75rem;color:var(--blue);">🔗 ${safeAttr(q.resource_name || 'Resource')}</a>` : ''}
+        <div style="font-size:0.78rem;color:var(--text2);margin-top:6px;">Why: ${safeAttr(q.why_this_task || 'This moves the roadmap forward.')}</div>
+        <div style="font-size:0.78rem;margin-top:4px;">Pass: ${safeAttr(q.pass_criteria || 'Complete with recall notes.')}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;">${skillTags}</div>
         <div class="progress-bar" style="margin-top:8px;"><div class="progress-fill" id="budget-${q.activity_id}" style="width:0%;background:${q.phase_color || '#4f46e5'}"></div></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
           <button class="btn btn-primary btn-sm" data-quest='${qJson}' onclick="startQuestFromBtn(this)">⏱ Start Timer</button>
-          <button class="btn btn-outline btn-sm" onclick="openReflectionModal('${q.activity_id}', '${actName}')">✅ Complete + Recall</button>
+          <button class="btn btn-outline btn-sm" data-activity-id="${safeAttr(q.activity_id)}" data-activity-name="${actName}" onclick="openReflectionFromBtn(this)">✅ Complete + Recall</button>
         </div>
       </div>
     </div>`;
@@ -1086,6 +1318,10 @@ function renderTodaysPlate(data) {
 
 function startQuestFromBtn(btn) {
   startQuest(JSON.parse(btn.dataset.quest));
+}
+
+function openReflectionFromBtn(btn) {
+  openReflectionModal(btn.dataset.activityId, btn.dataset.activityName);
 }
 
 async function loadQuestBudget(q) {
@@ -1186,9 +1422,11 @@ async function stopAndLogTaskTimer() {
 
 function openReflectionModal(activityId, activityName) {
   showModal('Complete Quest + Recall', `
-    <div style="font-size:0.9rem;margin-bottom:10px;">Before moving on, write what you learned from:<br><strong>${activityName}</strong></div>
+    <div style="font-size:0.9rem;margin-bottom:10px;">Before moving on, write what you learned from:<br><strong>${safeAttr(activityName)}</strong></div>
     <textarea id="reflectionContent" placeholder="What did you understand? What was tricky? How would you explain it tomorrow?" style="min-height:120px;"></textarea>
     <input id="reflectionTakeaways" placeholder="Key takeaways separated by commas" />
+    <input id="reflectionEvidence" placeholder="Evidence URL (GitHub, notebook, write-up, optional)" />
+    <input id="reflectionMastery" type="number" min="0" max="100" placeholder="Mastery score 0-100 (optional)" />
     <select id="reflectionDifficulty">
       <option value="1">Difficulty: 1 - Easy</option>
       <option value="2">Difficulty: 2</option>
@@ -1211,12 +1449,26 @@ async function completeQuestWithReflection(activityId) {
   }
   const takeaways = document.getElementById('reflectionTakeaways').value.split(',').map(x => x.trim()).filter(Boolean);
   const difficulty = parseInt(document.getElementById('reflectionDifficulty').value);
+  const masteryRaw = document.getElementById('reflectionMastery').value;
+  const mastery = masteryRaw ? parseInt(masteryRaw) : null;
+  if (mastery !== null && (Number.isNaN(mastery) || mastery < 0 || mastery > 100)) {
+    alert('Mastery score must be between 0 and 100.');
+    return;
+  }
   await api('/activities/' + activityId + '/complete', {
     method: 'POST',
-    body: JSON.stringify({ content, key_takeaways: takeaways, difficulty_rating: difficulty, time_spent_minutes: 0 })
+    body: JSON.stringify({
+      content,
+      key_takeaways: takeaways,
+      difficulty_rating: difficulty,
+      time_spent_minutes: 0,
+      mastery_score: mastery,
+      evidence_url: document.getElementById('reflectionEvidence').value.trim() || null
+    })
   });
   closeModal();
   loadTodaysPlate();
+  loadActivities();
   loadDashboard();
 }
 
@@ -1238,9 +1490,13 @@ async function loadRecentlyCompleted() {
         <div class="check-label done" style="text-decoration:none;font-weight:500;">${safeAttr(item.title)}</div>
         <div style="font-size:0.7rem;color:var(--text2);">${ago} ${phase}</div>
       </div>
-      <button class="btn btn-sm btn-outline" onclick="confirmUndo('${item.kind}','${item.id}','${safeAttr(item.title)}')">↩ Undo</button>
+      <button class="btn btn-sm btn-outline" data-kind="${safeAttr(item.kind)}" data-id="${safeAttr(item.id)}" data-title="${safeAttr(item.title)}" onclick="confirmUndoFromBtn(this)">↩ Undo</button>
     </div>`;
   }).join('');
+}
+
+function confirmUndoFromBtn(btn) {
+  confirmUndo(btn.dataset.kind, btn.dataset.id, btn.dataset.title);
 }
 
 function timeAgo(date) {
@@ -1255,7 +1511,7 @@ function timeAgo(date) {
 
 async function confirmUndo(kind, id, title) {
   if (!confirm(`Undo completion of "${title}"?\n\nTime logs and reflection notes are kept.`)) return;
-  const endpoint = `/api/${kind === 'activity' ? 'activities' : kind === 'project' ? 'projects' : 'books'}/${id}/reopen`;
+  const endpoint = `/${kind === 'activity' ? 'activities' : kind === 'project' ? 'projects' : 'books'}/${id}/reopen`;
   const res = await api(endpoint, { method: 'POST' });
   if (res && res.success) {
     // Optimistic UI: remove row immediately
@@ -1277,7 +1533,7 @@ function toggleQuickMenu() {
 
 function quickLogTime() {
   toggleQuickMenu();
-  document.querySelector('[data-tab="timer"]').click();
+  document.querySelector('[data-tab="plate"]').click();
   document.getElementById('logMinutes').focus();
 }
 
